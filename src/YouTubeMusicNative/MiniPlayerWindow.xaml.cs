@@ -37,6 +37,7 @@ public partial class MiniPlayerWindow : Window
     private EventHandler? _resize;
     private bool _drawerOpen;
     private EventHandler? _slide;
+    private Action? _finishSlide; // jumps a running tuck / reveal move to its end
     private readonly MiniPanelViewModel _panel;
     private Dock _dock;
     private bool _tucked;
@@ -165,6 +166,7 @@ public partial class MiniPlayerWindow : Window
         _drawerShowTimer.Tick += (_, _) =>
         {
             _drawerShowTimer.Stop();
+            if (_slide is not null) { _drawerShowTimer.Start(); return; } // still sliding out
             if (IsMouseOver && _panel.IsExpanded && !_tucked) SetDrawer(true, animate: true);
         };
         // Opened expanded with the pointer elsewhere: tuck the drawer away after the usual delay.
@@ -244,7 +246,7 @@ public partial class MiniPlayerWindow : Window
     private void OnDragStart(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed) return;
-        StopTween(ref _slide);
+        CompleteSlide();
         _hideTimer.Stop();
         _revealTimer.Stop();
 
@@ -300,33 +302,37 @@ public partial class MiniPlayerWindow : Window
             _drawerHideTimer.Stop();
             _drawerShowTimer.Stop();
             if (_drawerOpen) SetDrawer(false, animate: false);
-            // Shrink to a short handle centred on where the player was.
-            _fullHeight = Height;
-            _fullTop = Top;
+            // Remember the player's size and place (unless it's still sliding out towards them).
+            if (_slide is null)
+            {
+                _fullHeight = Height;
+                _fullTop = Top;
+            }
             _tucked = true;
-            Height = TabHeight;
-            Top = Math.Clamp(_fullTop + (_fullHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
         }
+        // Shrink into a square handle centred on where the player was, sliding off the edge at the same time,
+        // while the handle fades in over it.
+        double top = Math.Clamp(_fullTop + (_fullHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
         ShowTab(true);
-        SlideTo(target, animate);
+        MoveTo(target, top, TabHeight, tabOpacity: 1, animate);
     }
 
     private void Reveal()
     {
         var area = WorkArea();
         double target = _dock == Dock.Right ? area.Right - Width : area.Left;
-        if (_tucked)
-        {
-            _tucked = false;
-            Height = _fullHeight;
-            Top = Math.Clamp(_fullTop, area.Top, Math.Max(area.Top, area.Bottom - _fullHeight));
-        }
-        ShowTab(false);
-        SlideTo(target, animate: true);
+        _tucked = false;
+        // Grow out of the handle and slide in together (no jump to full height first); the handle fades away.
+        double top = Math.Clamp(_fullTop, area.Top, Math.Max(area.Top, area.Bottom - _fullHeight));
+        MoveTo(target, top, _fullHeight, tabOpacity: 0, animate: true, done: () => ShowTab(false));
         if (_panel.IsExpanded && !_drawerOpen) _drawerShowTimer.Start();
     }
 
-    private void ShowTab(bool show) => Tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    private void ShowTab(bool show)
+    {
+        Tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show) Tab.Opacity = 1;
+    }
 
     /// <summary>Peek out for a moment when the song changes while tucked away.</summary>
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
@@ -345,17 +351,58 @@ public partial class MiniPlayerWindow : Window
         _hideTimer.Interval = TimeSpan.FromMilliseconds(650);
     }
 
-    /// <summary>Eased horizontal slide (~180 ms, a little longer with smooth animations).</summary>
-    private void SlideTo(double target, bool animate)
+    /// <summary>
+    /// Eased move + resize of the whole window (tuck / reveal), one window move per frame, with the edge handle
+    /// cross-fading to <paramref name="tabOpacity"/>.
+    /// </summary>
+    private void MoveTo(double left, double top, double height, double tabOpacity, bool animate, Action? done = null)
     {
         StopTween(ref _slide);
-        if (!animate || Math.Abs(Left - target) < 1)
+        _finishSlide = null;
+        void Finish()
         {
-            Left = target;
+            Left = left;
+            Top = top;
+            Height = height;
+            Tab.Opacity = tabOpacity;
+            done?.Invoke();
+        }
+        var from = CurrentBounds();
+        if (!animate || from is null)
+        {
+            Finish();
             return;
         }
-        double from = Left;
-        _slide = Tween(Motion.Duration(180), eased => Left = from + (target - from) * eased, () => _slide = null);
+        var (fromL, fromT, fromH) = from.Value;
+        double fromTab = Tab.Visibility == Visibility.Visible ? Tab.Opacity : 1 - tabOpacity;
+        _finishSlide = () =>
+        {
+            StopTween(ref _slide);
+            _finishSlide = null;
+            Finish();
+        };
+        _slide = Tween(Motion.Duration(200), eased =>
+        {
+            SetBounds(fromL + (left - fromL) * eased, fromT + (top - fromT) * eased, fromH + (height - fromH) * eased);
+            Tab.Opacity = fromTab + (tabOpacity - fromTab) * eased;
+        }, () =>
+        {
+            _slide = null;
+            _finishSlide = null;
+            Finish();
+        });
+    }
+
+    /// <summary>Ends a running tuck / reveal move at its destination (before resizing or dragging the window).</summary>
+    private void CompleteSlide() => _finishSlide?.Invoke();
+
+    /// <summary>Where the window really is right now (mid-animation the WPF properties can lag behind).</summary>
+    private (double Left, double Top, double Height)? CurrentBounds()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var r)) return null;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return (r.Left / dpi.DpiScaleX, r.Top / dpi.DpiScaleY, (r.Bottom - r.Top) / dpi.DpiScaleY);
     }
 
     /// <summary>
@@ -406,6 +453,7 @@ public partial class MiniPlayerWindow : Window
     private void SetDrawer(bool open, bool animate, bool initial = false)
     {
         if (open == _drawerOpen && !initial) return;
+        CompleteSlide(); // measure from where the window ends up, not from mid-slide
         _drawerOpen = open;
         double height = open ? CompactHeight + DrawerHeight : CompactHeight;
 
@@ -430,6 +478,7 @@ public partial class MiniPlayerWindow : Window
     private void ResizeTo(double height, double top, bool animate, Action done)
     {
         StopTween(ref _resize);
+        CompleteSlide();
         if (!animate)
         {
             Height = height;
@@ -437,9 +486,9 @@ public partial class MiniPlayerWindow : Window
             done();
             return;
         }
-        double fromH = Height, fromT = Top;
+        var (fromL, fromT, fromH) = CurrentBounds() ?? (Left, Top, Height);
         _resize = Tween(Motion.Duration(220),
-            eased => SetBounds(fromT + (top - fromT) * eased, fromH + (height - fromH) * eased),
+            eased => SetBounds(fromL, fromT + (top - fromT) * eased, fromH + (height - fromH) * eased),
             () =>
             {
                 _resize = null;
@@ -453,17 +502,18 @@ public partial class MiniPlayerWindow : Window
     /// Moves the top edge and resizes in one window move. Setting Top and then Height moves the window twice per
     /// frame, which made the bottom edge wobble while the drawer opened upwards.
     /// </summary>
-    private void SetBounds(double top, double height)
+    private void SetBounds(double left, double top, double height)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero)
         {
+            Left = left;
             Top = top;
             Height = height;
             return;
         }
         var dpi = VisualTreeHelper.GetDpi(this);
-        SetWindowPos(hwnd, IntPtr.Zero, (int)Math.Round(Left * dpi.DpiScaleX), (int)Math.Round(top * dpi.DpiScaleY),
+        SetWindowPos(hwnd, IntPtr.Zero, (int)Math.Round(left * dpi.DpiScaleX), (int)Math.Round(top * dpi.DpiScaleY),
             (int)Math.Round(Width * dpi.DpiScaleX), (int)Math.Round(height * dpi.DpiScaleY), SwpNoZOrder | SwpNoActivate);
     }
 
@@ -505,6 +555,9 @@ public partial class MiniPlayerWindow : Window
     }
 
     private const uint SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);

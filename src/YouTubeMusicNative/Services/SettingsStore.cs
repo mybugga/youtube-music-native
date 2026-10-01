@@ -33,6 +33,7 @@ public sealed class AppSettings
     /// </summary>
     public string? Performance { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public string PerformanceMode => Performance ?? (LowMemoryRendering ? "LessMemory" : "Standard");
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
