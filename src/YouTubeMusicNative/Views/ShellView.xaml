@@ -32,9 +32,23 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                <!-- The logo, live: its bars bounce like an equalizer while music plays -->
-                <v:LiveLogo Width="28" Height="28" Playback="{Binding Playback}"/>
-                <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
+                <!-- Logo + name: click to leave Now Playing, or to go Home. The logo is live: its bars bounce while music plays. -->
+                <Button Command="{Binding LogoClickCommand}" WindowChrome.IsHitTestVisibleInChrome="True" Cursor="Hand"
+                        Focusable="False" ToolTip="Home">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <StackPanel x:Name="Root" Orientation="Horizontal" Background="Transparent">
+                                <v:LiveLogo Width="28" Height="28" Playback="{Binding Playback}"/>
+                                <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Root" Property="Opacity" Value="0.7"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
                 <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Margin="16,0,0,0" ToolTip="Go back"
                         Command="{Binding GoBackCommand}" WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Margin="2,0,0,0" ToolTip="Go forward"

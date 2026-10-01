@@ -35,6 +35,38 @@ public static class ArtistLinks
         else block.Inlines.Add(new Run(album));
     }
 
+    /// <summary>
+    /// <c>v:ArtistLinks.Item="{Binding}"</c> on a card's subtitle: the artist and album names in it become links
+    /// to their pages; everything else ("Album", "2.1M views", "•") stays plain text.
+    /// </summary>
+    public static readonly DependencyProperty ItemProperty = DependencyProperty.RegisterAttached(
+        "Item", typeof(MediaItem), typeof(ArtistLinks), new PropertyMetadata(null, OnItemChanged));
+
+    public static MediaItem? GetItem(DependencyObject d) => (MediaItem?)d.GetValue(ItemProperty);
+    public static void SetItem(DependencyObject d, MediaItem? value) => d.SetValue(ItemProperty, value);
+
+    private static void OnItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not TextBlock block) return;
+        block.Inlines.Clear();
+        if (e.NewValue is not MediaItem item) return;
+        if (item.SubtitleRuns is not { Count: > 0 } runs)
+        {
+            block.Inlines.Add(new Run(item.Subtitle));
+            return;
+        }
+        foreach (var run in runs)
+        {
+            var text = run.Text;
+            if (run.BrowseId is { } id && id.StartsWith("UC"))
+                block.Inlines.Add(Link(block, text, $"Go to {text}", () => OpenArtist?.Invoke(id, text)));
+            else if (run.BrowseId is { } albumId && albumId.StartsWith("MPRE"))
+                block.Inlines.Add(Link(block, text, $"Go to {text}", () => OpenAlbum?.Invoke(albumId, text, null)));
+            else
+                block.Inlines.Add(new Run(text));
+        }
+    }
+
     public static readonly DependencyProperty TrackProperty = DependencyProperty.RegisterAttached(
         "Track", typeof(Track), typeof(ArtistLinks), new PropertyMetadata(null, OnTrackChanged));
 

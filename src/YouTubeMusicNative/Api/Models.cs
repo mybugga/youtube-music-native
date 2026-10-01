@@ -101,6 +101,9 @@ public enum PlaylistPrivacy { Private, Unlisted, Public }
 public enum ItemKind { Song, Playlist, Album, Artist }
 
 /// <summary>A card on the home feed: either a playable song or something to open (playlist/album/artist).</summary>
+/// <summary>A piece of text; <see cref="BrowseId"/> is set when YouTube links it (an artist "UC…", an album "MPRE…").</summary>
+public sealed record TextRun(string Text, string? BrowseId);
+
 public sealed record MediaItem(
     ItemKind Kind,
     string Title,
@@ -110,6 +113,9 @@ public sealed record MediaItem(
     string? BrowseId)
 {
     public bool IsArtist => Kind == ItemKind.Artist;
+
+    /// <summary>The subtitle in pieces, with the artist / album ids YouTube linked (for clickable names on cards).</summary>
+    public IReadOnlyList<TextRun>? SubtitleRuns { get; init; }
 
     public Track ToTrack() => new(VideoId!, Title, Subtitle, null, null, ThumbnailUrl);
 

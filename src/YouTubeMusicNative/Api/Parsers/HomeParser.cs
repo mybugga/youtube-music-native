@@ -44,8 +44,10 @@ internal static class HomeParser
         var subtitle = r["subtitle"].Text();
         var thumb = JsonNav.Thumbnail(r.Path("thumbnailRenderer.musicThumbnailRenderer.thumbnail.thumbnails"), 200);
 
+        var runs = SubtitleRuns(r["subtitle"]);
+
         if (r.Str("navigationEndpoint.watchEndpoint.videoId") is { } videoId)
-            return new MediaItem(ItemKind.Song, title, StripTypePrefix(subtitle), thumb, videoId, null);
+            return new MediaItem(ItemKind.Song, title, StripTypePrefix(subtitle), thumb, videoId, null) { SubtitleRuns = StripTypePrefix(runs) };
 
         var browseId = r.Str("navigationEndpoint.browseEndpoint.browseId");
         if (browseId is null) return null;
@@ -57,14 +59,38 @@ internal static class HomeParser
             "MUSIC_PAGE_TYPE_PLAYLIST" => ItemKind.Playlist,
             _ => (ItemKind?)null,
         };
-        return kind is null ? null : new MediaItem(kind.Value, title, subtitle, thumb, null, browseId);
+        return kind is null ? null : new MediaItem(kind.Value, title, subtitle, thumb, null, browseId) { SubtitleRuns = runs };
+    }
+
+    /// <summary>A subtitle's runs, keeping the browse id of each linked name.</summary>
+    private static List<TextRun>? SubtitleRuns(JsonNode? subtitle)
+    {
+        if (subtitle?["runs"] is not JsonArray runs) return null;
+        var result = new List<TextRun>();
+        foreach (var run in runs)
+            if (run.Str("text") is { Length: > 0 } text)
+                result.Add(new TextRun(text, run.Str("navigationEndpoint.browseEndpoint.browseId")));
+        return result.Count > 0 ? result : null;
+    }
+
+    /// <summary>[Song][ • ][Artist]… → [Artist]…</summary>
+    private static List<TextRun>? StripTypePrefix(List<TextRun>? runs)
+    {
+        if (runs is { Count: > 2 } && runs[0].Text is "Song" or "Video" or "Single" && runs[1].Text.Trim() == "•")
+            return runs.Skip(2).ToList();
+        return runs;
     }
 
     private static MediaItem? ParseSongRow(JsonObject r)
     {
         var track = TrackParser.ParseListItem(r);
         return track is null ? null
-            : new MediaItem(ItemKind.Song, track.Title, track.Artists, track.ThumbnailUrl, track.VideoId, null);
+            : new MediaItem(ItemKind.Song, track.Title, track.Artists, track.ThumbnailUrl, track.VideoId, null)
+            {
+                SubtitleRuns = track.ArtistLinks?.SelectMany((a, i) => i == 0
+                    ? new[] { new TextRun(a.Name, a.BrowseId) }
+                    : new[] { new TextRun(", ", null), new TextRun(a.Name, a.BrowseId) }).ToList(),
+            };
     }
 
     /// <summary>"Song • Artist" → "Artist".</summary>

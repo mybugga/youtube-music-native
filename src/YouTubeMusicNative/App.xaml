@@ -1332,7 +1332,8 @@
                                 CommandParameter="{Binding}"/>
                     </Grid>
                     <TextBlock Text="{Binding Title}" Style="{StaticResource Title}" FontSize="15" Margin="0,10,0,0"/>
-                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" TextWrapping="Wrap" MaxHeight="36" Margin="0,3,0,0"
+                    <!-- Artist and album names in the subtitle are links to their pages -->
+                    <TextBlock v:ArtistLinks.Item="{Binding}" Style="{StaticResource Sub}" TextWrapping="Wrap" MaxHeight="36" Margin="0,3,0,0"
                                LineStackingStrategy="BlockLineHeight" LineHeight="18"/>
                 </StackPanel>
             </Button>
