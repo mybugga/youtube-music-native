@@ -23,6 +23,9 @@ public sealed class AppSettings
     public string? LastView { get; set; }
     /// <summary>If music was playing when the app closed, start it again (same song, position and queue) at startup.</summary>
     public bool ResumePlaybackOnStart { get; set; } = true;
+
+    /// <summary>Draw with the CPU instead of the GPU: ~40 MB less memory for a little more CPU. Applies on restart.</summary>
+    public bool LowMemoryRendering { get; set; } = true;
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
     /// <summary>"Left"/"Right" when the mini player is docked (tucked) against that screen edge.</summary>

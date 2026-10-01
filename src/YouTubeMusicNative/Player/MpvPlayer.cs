@@ -43,8 +43,9 @@ public sealed class MpvPlayer : IDisposable
         Opt("input-default-bindings", "no");
         Opt("idle", "yes");
         Opt("cache", "yes");
-        Opt("demuxer-max-bytes", "8MiB");
-        Opt("demuxer-max-back-bytes", "2MiB");
+        // ~3 MiB ahead is still a couple of minutes of opus audio; a bigger buffer only costs memory.
+        Opt("demuxer-max-bytes", "3MiB");
+        Opt("demuxer-max-back-bytes", "1MiB");
         Opt("ytdl", "yes");
         Opt("ytdl-format", "bestaudio[acodec=opus]/bestaudio/best");
         // all_formats=no: newer mpv builds default to stitching *every* format (incl. video and HLS) into one

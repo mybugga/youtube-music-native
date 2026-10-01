@@ -49,7 +49,11 @@ public partial class MainWindow : Window
             FitMaximized(); // StateChanged doesn't fire for a window that starts maximized
         };
         DpiChanged += (_, e) => ThumbnailConverter.DpiScale = e.NewDpi.DpiScaleX;
-        StateChanged += (_, _) => FitMaximized();
+        StateChanged += (_, _) =>
+        {
+            FitMaximized();
+            if (WindowState == WindowState.Minimized) TrimMemory();
+        };
         PreviewKeyDown += OnPreviewKeyDown;
         BuildContent();
     }
@@ -91,15 +95,17 @@ public partial class MainWindow : Window
         Content = null;
         ThumbnailConverter.Clear();
 
-        Dispatcher.BeginInvoke(() =>
-        {
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
-            GC.WaitForPendingFinalizers();
-            // Let Windows reclaim the pages the UI was using; they're re-faulted only if the window comes back.
-            SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
-        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        TrimMemory();
     }
+
+    /// <summary>Compacts the heap and lets Windows take back idle pages (re-read only when used again).</summary>
+    public void TrimMemory() => Dispatcher.BeginInvoke(() =>
+    {
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
+    }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
 
     // ---- caption buttons --------------------------------------------------------------------
 

@@ -63,6 +63,20 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Music that was playing when the app closed starts again at the next launch.</summary>
+    /// <summary>Settings: software rendering to save memory (takes effect the next time the app starts).</summary>
+    public bool LowMemoryRendering
+    {
+        get => _store.Settings.LowMemoryRendering;
+        set
+        {
+            if (_store.Settings.LowMemoryRendering == value) return;
+            _store.Settings.LowMemoryRendering = value;
+            _store.Save();
+            OnPropertyChanged();
+            Playback.ShowStatus("Takes effect the next time the app starts");
+        }
+    }
+
     public bool ResumePlaybackOnStart
     {
         get => _store.Settings.ResumePlaybackOnStart;

@@ -46,6 +46,9 @@ public partial class App : Application
         Connectivity.Instance.Start();
         _store = new SettingsStore();
         _store.Load();
+        // Software rendering skips the GPU driver's per-process memory (~40 MB); must be set before any window.
+        if (_store.Settings.LowMemoryRendering)
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         if (UpdateService.InstallPendingAtStartup(_store))
         {
             Shutdown(); // the installer starts the new version when it's done

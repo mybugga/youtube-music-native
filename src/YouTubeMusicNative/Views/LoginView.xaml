@@ -224,6 +224,16 @@
                         </DockPanel>
                         <Border Height="1" Background="#1AFFFFFF"/>
                         <DockPanel Margin="0,14">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding LowMemoryRendering}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Use less memory" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Draws the app with the processor instead of the graphics card, which saves about 40 MB. Turn it off if animations aren't smooth. Applies the next time the app starts."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
                             <Button DockPanel.Dock="Right" Style="{StaticResource OutlinePill}" Content="Clear cache" VerticalAlignment="Center"
                                     Padding="14,6" Command="{Binding ClearCacheCommand}"/>
                             <StackPanel Margin="0,0,24,0">
