@@ -34,9 +34,9 @@ public partial class MiniPlayerWindow : Window
     private readonly DispatcherTimer _revealTimer;
     private readonly DispatcherTimer _drawerHideTimer;  // auto-hide the drawer ~2 s after the pointer leaves
     private readonly DispatcherTimer _drawerShowTimer;  // ...and bring it back shortly after it returns
-    private DispatcherTimer? _resize;
+    private EventHandler? _resize;
     private bool _drawerOpen;
-    private DispatcherTimer? _slide;
+    private EventHandler? _slide;
     private readonly MiniPanelViewModel _panel;
     private Dock _dock;
     private bool _tucked;
@@ -234,8 +234,8 @@ public partial class MiniPlayerWindow : Window
             _revealTimer.Stop();
             _drawerHideTimer.Stop();
             _drawerShowTimer.Stop();
-            _slide?.Stop();
-            _resize?.Stop();
+            StopTween(ref _slide);
+            StopTween(ref _resize);
         };
     }
 
@@ -244,7 +244,7 @@ public partial class MiniPlayerWindow : Window
     private void OnDragStart(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed) return;
-        _slide?.Stop();
+        StopTween(ref _slide);
         _hideTimer.Stop();
         _revealTimer.Stop();
 
@@ -345,27 +345,43 @@ public partial class MiniPlayerWindow : Window
         _hideTimer.Interval = TimeSpan.FromMilliseconds(650);
     }
 
-    /// <summary>Eased horizontal slide (~180 ms). The timer only runs during the slide.</summary>
+    /// <summary>Eased horizontal slide (~180 ms, a little longer with smooth animations).</summary>
     private void SlideTo(double target, bool animate)
     {
-        _slide?.Stop();
+        StopTween(ref _slide);
         if (!animate || Math.Abs(Left - target) < 1)
         {
             Left = target;
             return;
         }
         double from = Left;
-        var start = Environment.TickCount64;
-        const double duration = 180;
-        _slide = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(8) };
-        _slide.Tick += (_, _) =>
+        _slide = Tween(Motion.Duration(180), eased => Left = from + (target - from) * eased, () => _slide = null);
+    }
+
+    /// <summary>
+    /// Calls <paramref name="step"/> once per rendered frame, in step with the display, with eased progress 0..1.
+    /// Returns the frame handler so the tween can be stopped.
+    /// </summary>
+    private static EventHandler Tween(double ms, Action<double> step, Action done)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        EventHandler? frame = null;
+        frame = (_, _) =>
         {
-            double p = Math.Min(1, (Environment.TickCount64 - start) / duration);
-            double eased = 1 - Math.Pow(1 - p, 3);
-            Left = from + (target - from) * eased;
-            if (p >= 1) _slide!.Stop();
+            double p = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
+            step(Motion.EaseOut(p));
+            if (p < 1) return;
+            CompositionTarget.Rendering -= frame;
+            done();
         };
-        _slide.Start();
+        CompositionTarget.Rendering += frame;
+        return frame;
+    }
+
+    private static void StopTween(ref EventHandler? tween)
+    {
+        if (tween is not null) CompositionTarget.Rendering -= tween;
+        tween = null;
     }
 
     /// <summary>Work area (screen minus taskbar) of the monitor the window is on, in WPF units.</summary>
@@ -410,10 +426,10 @@ public partial class MiniPlayerWindow : Window
         ResizeTo(height, top, animate, done: () => { if (!_drawerOpen) Drawer.Visibility = Visibility.Collapsed; });
     }
 
-    /// <summary>Eased height (and top) change; the timer only runs while resizing.</summary>
+    /// <summary>Eased height (and top) change, one frame at a time.</summary>
     private void ResizeTo(double height, double top, bool animate, Action done)
     {
-        _resize?.Stop();
+        StopTween(ref _resize);
         if (!animate)
         {
             Height = height;
@@ -422,20 +438,33 @@ public partial class MiniPlayerWindow : Window
             return;
         }
         double fromH = Height, fromT = Top;
-        var start = Environment.TickCount64;
-        const double duration = 220;
-        _resize = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(8) };
-        _resize.Tick += (_, _) =>
+        _resize = Tween(Motion.Duration(220),
+            eased => SetBounds(fromT + (top - fromT) * eased, fromH + (height - fromH) * eased),
+            () =>
+            {
+                _resize = null;
+                Height = height;
+                Top = top;
+                done();
+            });
+    }
+
+    /// <summary>
+    /// Moves the top edge and resizes in one window move. Setting Top and then Height moves the window twice per
+    /// frame, which made the bottom edge wobble while the drawer opened upwards.
+    /// </summary>
+    private void SetBounds(double top, double height)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
         {
-            double p = Math.Min(1, (Environment.TickCount64 - start) / duration);
-            double eased = 1 - Math.Pow(1 - p, 3);
-            Height = fromH + (height - fromH) * eased;
-            Top = fromT + (top - fromT) * eased;
-            if (p < 1) return;
-            _resize!.Stop();
-            done();
-        };
-        _resize.Start();
+            Top = top;
+            Height = height;
+            return;
+        }
+        var dpi = VisualTreeHelper.GetDpi(this);
+        SetWindowPos(hwnd, IntPtr.Zero, (int)Math.Round(Left * dpi.DpiScaleX), (int)Math.Round(top * dpi.DpiScaleY),
+            (int)Math.Round(Width * dpi.DpiScaleX), (int)Math.Round(height * dpi.DpiScaleY), SwpNoZOrder | SwpNoActivate);
     }
 
     private void OnClearSearch(object sender, RoutedEventArgs e)
@@ -474,6 +503,11 @@ public partial class MiniPlayerWindow : Window
         public NativeRect Work;
         public uint Flags;
     }
+
+    private const uint SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);

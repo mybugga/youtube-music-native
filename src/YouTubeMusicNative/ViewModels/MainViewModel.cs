@@ -62,34 +62,26 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>Settings: software rendering to save memory (takes effect the next time the app starts).</summary>
-    /// <summary>Settings: smooth animations. The motion itself switches live; GPU drawing at full refresh rate applies on restart.</summary>
-    public bool SmoothAnimations
-    {
-        get => _store.Settings.SmoothAnimations;
-        set
-        {
-            if (_store.Settings.SmoothAnimations == value) return;
-            _store.Settings.SmoothAnimations = value;
-            _store.Save();
-            Views.Motion.Enabled = value;
-            OnPropertyChanged();
-            if (_store.Settings.LowMemoryRendering)
-                Playback.ShowStatus(value ? "Restart the app for the smoothest animations" : "Restart the app to use less memory again");
-        }
-    }
+    /// <summary>Settings: drawing mode, "LessMemory" / "Standard" / "Smooth" (see AppSettings.Performance).</summary>
+    public string PerformanceMode => _store.Settings.PerformanceMode;
 
-    public bool LowMemoryRendering
+    public string PerformanceDescription => PerformanceMode switch
     {
-        get => _store.Settings.LowMemoryRendering;
-        set
-        {
-            if (_store.Settings.LowMemoryRendering == value) return;
-            _store.Settings.LowMemoryRendering = value;
-            _store.Save();
-            OnPropertyChanged();
-            Playback.ShowStatus("Takes effect the next time the app starts");
-        }
+        "Smooth" => "Eased scrolling, sliding pages and dialogs, fading highlights, a gliding progress bar and a smoother mini player, drawn by the graphics card at your screen's refresh rate. Uses about 40 MB more memory.",
+        "Standard" => "Drawn by the graphics card, without the extra animations. Uses about 40 MB more memory than Less memory.",
+        _ => "Drawn by the processor instead of the graphics card, which saves about 40 MB. Simple animations only.",
+    };
+
+    [RelayCommand]
+    private void SetPerformance(string mode)
+    {
+        if (mode == PerformanceMode) return;
+        _store.Settings.Performance = mode;
+        _store.Save();
+        Views.Motion.Enabled = mode == "Smooth";
+        OnPropertyChanged(nameof(PerformanceMode));
+        OnPropertyChanged(nameof(PerformanceDescription));
+        Playback.ShowStatus("Fully applies the next time the app starts");
     }
 
     public bool ResumePlaybackOnStart

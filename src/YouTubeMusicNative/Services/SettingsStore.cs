@@ -24,11 +24,16 @@ public sealed class AppSettings
     /// <summary>If music was playing when the app closed, start it again (same song, position and queue) at startup.</summary>
     public bool ResumePlaybackOnStart { get; set; } = true;
 
-    /// <summary>Draw with the CPU instead of the GPU: ~40 MB less memory for a little more CPU. Applies on restart.</summary>
+    /// <summary>Older builds' on/off "Use less memory" switch; only read to pick the first <see cref="Performance"/>.</summary>
     public bool LowMemoryRendering { get; set; } = true;
 
-    /// <summary>Eased scrolling, page / dialog transitions and fading hovers; also draws with the GPU at the display's refresh rate.</summary>
-    public bool SmoothAnimations { get; set; }
+    /// <summary>
+    /// How the app draws (applies on restart): "LessMemory" = CPU drawing, ~40 MB less memory (default);
+    /// "Standard" = GPU drawing; "Smooth" = GPU at the display's refresh rate plus eased scrolling, transitions and fades.
+    /// </summary>
+    public string? Performance { get; set; }
+
+    public string PerformanceMode => Performance ?? (LowMemoryRendering ? "LessMemory" : "Standard");
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
     /// <summary>"Left"/"Right" when the mini player is docked (tucked) against that screen edge.</summary>

@@ -21,11 +21,7 @@
         <!-- Window buttons fade in while the pointer is over the player -->
         <Style x:Key="HoverReveal" TargetType="FrameworkElement">
             <Setter Property="Opacity" Value="0"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                    <Setter Property="Opacity" Value="1"/>
-                </DataTrigger>
-            </Style.Triggers>
+            <Setter Property="v:Motion.Show" Value="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}"/>
         </Style>
 
         <!-- Drawer tab: dim text, white pill when selected (Tag = tab name) -->
@@ -64,7 +60,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid ClipToBounds="True">
+    <Grid ClipToBounds="True" v:Motion.FadeIn="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="136"/>
             <RowDefinition Height="*"/>
@@ -118,13 +114,15 @@
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource PlayButton}">
                             <Setter Property="Opacity" Value="0"/>
+                            <Setter Property="v:Motion.Show">
+                                <Setter.Value>
+                                    <MultiBinding Converter="{StaticResource AnyTrue}">
+                                        <Binding Path="IsMouseOver" ElementName="Cover"/>
+                                        <Binding Path="Playback.IsPaused"/>
+                                    </MultiBinding>
+                                </Setter.Value>
+                            </Setter>
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=Cover}" Value="True">
-                                    <Setter Property="Opacity" Value="1"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Playback.IsPaused}" Value="True">
-                                    <Setter Property="Opacity" Value="1"/>
-                                </DataTrigger>
                                 <DataTrigger Binding="{Binding Playback.IsBuffering}" Value="True">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
@@ -150,7 +148,7 @@
                         <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" Width="26" Height="26"
                                 ToolTip="Close (keeps playing in the tray)" Click="OnCloseClick"/>
                     </StackPanel>
-                    <StackPanel>
+                    <StackPanel v:Motion.AnimateOnChange="{Binding Playback.NowPlaying}">
                         <TextBlock Text="{Binding Playback.NowPlaying.Title, TargetNullValue='Nothing playing', FallbackValue='Nothing playing'}"
                                    Style="{StaticResource Title}" FontSize="15" FontWeight="Bold"/>
                         <TextBlock v:ArtistLinks.Track="{Binding Playback.NowPlaying}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"
@@ -224,7 +222,7 @@
 
 
         <!-- ================================================= Drawer: up next / search / library -->
-        <Grid x:Name="Drawer" Grid.Row="1" Height="380" VerticalAlignment="Top" Background="#121212" Visibility="Collapsed">
+        <Grid x:Name="Drawer" Grid.Row="1" Height="380" VerticalAlignment="Top" Background="#121212" Visibility="Collapsed" v:Motion.SlideIn="True">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -399,7 +397,7 @@
 
         <!-- Handle shown while tucked against a screen edge: the window shrinks to this square and only it is on
              screen. Just the cover, with a thin progress line; dimmed with a play mark while paused. Hover to slide out. -->
-        <Grid x:Name="Tab" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Top" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
+        <Grid x:Name="Tab" v:Motion.PopIn="True" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Top" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
               Background="{StaticResource Elevated}" ToolTip="{Binding Playback.NowPlaying.Title}">
             <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="16" Foreground="{StaticResource TextFaint}"/>
             <Rectangle>

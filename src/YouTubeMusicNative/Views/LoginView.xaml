@@ -223,23 +223,21 @@
                             </StackPanel>
                         </DockPanel>
                         <Border Height="1" Background="#1AFFFFFF"/>
+                        <!-- Performance: one choice of three (Less memory is the default) -->
                         <DockPanel Margin="0,14">
-                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
-                                          IsChecked="{Binding SmoothAnimations}"/>
+                            <Border DockPanel.Dock="Right" VerticalAlignment="Center" Background="#2A2A2A" CornerRadius="17" Padding="3">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource Segment}" Content="Less memory" Tag="LessMemory"
+                                            Command="{Binding SetPerformanceCommand}" CommandParameter="LessMemory"/>
+                                    <Button Style="{StaticResource Segment}" Content="Standard" Tag="Standard"
+                                            Command="{Binding SetPerformanceCommand}" CommandParameter="Standard"/>
+                                    <Button Style="{StaticResource Segment}" Content="Smooth" Tag="Smooth"
+                                            Command="{Binding SetPerformanceCommand}" CommandParameter="Smooth"/>
+                                </StackPanel>
+                            </Border>
                             <StackPanel Margin="0,0,24,0">
-                                <TextBlock Text="Smooth animations" FontWeight="SemiBold" FontSize="14"/>
-                                <TextBlock Text="Eased scrolling, sliding pages and dialogs, fading highlights and a smoothly moving progress bar, drawn by the graphics card at your screen's refresh rate. Uses about 40 MB more memory; the full effect applies the next time the app starts."
-                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
-                            </StackPanel>
-                        </DockPanel>
-                        <Border Height="1" Background="#1AFFFFFF"/>
-                        <DockPanel Margin="0,14"
-                                   IsEnabled="{Binding SmoothAnimations, Converter={StaticResource Not}}">
-                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
-                                          IsChecked="{Binding LowMemoryRendering}"/>
-                            <StackPanel Margin="0,0,24,0">
-                                <TextBlock Text="Use less memory" FontWeight="SemiBold" FontSize="14"/>
-                                <TextBlock Text="Draws the app with the processor instead of the graphics card, which saves about 40 MB. Not used while smooth animations are on. Applies the next time the app starts."
+                                <TextBlock Text="Performance" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="{Binding PerformanceDescription}"
                                            Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
                             </StackPanel>
                         </DockPanel>

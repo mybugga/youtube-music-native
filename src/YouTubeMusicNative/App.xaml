@@ -46,6 +46,7 @@
         <s:IndexConverter x:Key="Index"/>
         <s:TrackNumberConverter x:Key="TrackNumber"/>
         <s:NotConverter x:Key="Not"/>
+        <s:AnyTrueConverter x:Key="AnyTrue"/>
         <BooleanToVisibilityConverter x:Key="BoolVis"/>
 
         <!-- ================================================================ Text -->
@@ -258,6 +259,40 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+        <!-- One option of a segmented choice: Tag is the option, highlighted when it equals the DataContext's PerformanceMode -->
+        <Style x:Key="Segment" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border CornerRadius="14" Background="{StaticResource RowHover}" v:Motion.HoverOverlay="True"/>
+                            <Border CornerRadius="14" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource EqualsMulti}">
+                            <Binding Path="Tag" RelativeSource="{RelativeSource Self}"/>
+                            <Binding Path="PerformanceMode"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="White"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <!-- Filled accent pill for a dialog's main (destructive) action -->
         <Style x:Key="AccentPill" TargetType="Button" BasedOn="{StaticResource PillButton}">

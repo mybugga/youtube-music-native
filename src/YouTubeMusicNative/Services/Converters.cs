@@ -32,6 +32,13 @@ public sealed class NullToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>True when any of the bound values is true.</summary>
+public sealed class AnyTrueConverter : IMultiValueConverter
+{
+    public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture) => values.Any(v => v is true);
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
 /// <summary>Inverts a bool.</summary>
 public sealed class NotConverter : IValueConverter
 {

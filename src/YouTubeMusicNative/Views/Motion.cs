@@ -81,6 +81,70 @@ public static class Motion
         };
     }
 
+    // ---- fade in / out ------------------------------------------------------------------------
+
+    /// <summary>Bind to a bool: the element fades to fully visible when true and to transparent when false.</summary>
+    public static readonly DependencyProperty ShowProperty = DependencyProperty.RegisterAttached(
+        "Show", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnShowChanged));
+
+    public static bool GetShow(DependencyObject d) => (bool)d.GetValue(ShowProperty);
+    public static void SetShow(DependencyObject d, bool value) => d.SetValue(ShowProperty, value);
+
+    private static void OnShowChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement element) return;
+        bool show = e.NewValue is true;
+        if (!element.IsLoaded)
+        {
+            element.BeginAnimation(UIElement.OpacityProperty, null);
+            element.Opacity = show ? 1 : 0;
+            return;
+        }
+        Animate(element, UIElement.OpacityProperty, null, show ? 1 : 0, show ? 140 : 260);
+    }
+
+    /// <summary>Fades and slides an element down into place each time it becomes visible (the mini player's drawer).</summary>
+    public static readonly DependencyProperty SlideInProperty = DependencyProperty.RegisterAttached(
+        "SlideIn", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnSlideInChanged));
+
+    public static bool GetSlideIn(DependencyObject d) => (bool)d.GetValue(SlideInProperty);
+    public static void SetSlideIn(DependencyObject d, bool value) => d.SetValue(SlideInProperty, value);
+
+    private static void OnSlideInChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement element || e.NewValue is not true) return;
+        var shift = new TranslateTransform();
+        element.RenderTransform = shift;
+        element.IsVisibleChanged += (_, args) =>
+        {
+            if (args.NewValue is not true || !Enabled) return;
+            Animate(element, UIElement.OpacityProperty, 0, 1, 260);
+            Animate(shift, TranslateTransform.YProperty, -16, 0, 340);
+        };
+    }
+
+    /// <summary>Fades the element in each time it becomes visible (a window's content when the window is shown).</summary>
+    public static readonly DependencyProperty FadeInProperty = DependencyProperty.RegisterAttached(
+        "FadeIn", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnFadeInChanged));
+
+    public static bool GetFadeIn(DependencyObject d) => (bool)d.GetValue(FadeInProperty);
+    public static void SetFadeIn(DependencyObject d, bool value) => d.SetValue(FadeInProperty, value);
+
+    private static void OnFadeInChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not UIElement element || e.NewValue is not true) return;
+        element.IsVisibleChanged += (_, args) =>
+        {
+            if (args.NewValue is true && Enabled) Animate(element, UIElement.OpacityProperty, 0, 1, 240);
+        };
+    }
+
+    /// <summary>Eases a 0..1 progress: cubic normally, a softer quartic tail with smooth animations on.</summary>
+    public static double EaseOut(double p) => Enabled ? 1 - Math.Pow(1 - p, 4) : 1 - Math.Pow(1 - p, 3);
+
+    /// <summary>Stretches a duration a little with smooth animations on (gentler motion, more frames).</summary>
+    public static double Duration(double ms) => Enabled ? ms * 1.45 : ms;
+
     // ---- page transition ---------------------------------------------------------------------
 
     /// <summary>On the shell's page host: each new page fades in and rises slightly.</summary>

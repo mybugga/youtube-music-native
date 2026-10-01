@@ -19,6 +19,10 @@ easily takes 500 MB–1 GB of RAM. This app plays the same music in a fraction o
 | --- | --- |
 | ![Search](docs/screenshots/search.png) | ![Mini player](docs/screenshots/mini-player.png) |
 
+| Settings: pick *Less memory*, *Standard* or *Smooth* |
+| --- |
+| ![Settings](docs/screenshots/settings.png) |
+
 ## Install
 
 Download **`YouTubeMusicNative-<version>-setup.exe`** from the
@@ -42,10 +46,21 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 - **Home** feed (personalised when signed in), live search as you type, recent searches
 - Playlist and album pages with an art-tinted header, Play and Shuffle. Hover a song's cover to play it. On
   the current song, the same button pauses and resumes.
-- **Now Playing** view: big art, up-next list, background tinted from the album art (click the player bar)
+- **Artist pages** like YouTube Music's: banner, Shuffle and Mix, top songs, albums, singles and related artists.
+  Artist and album names are links everywhere, and searching an artist shows a top-result card.
+- **Now Playing** view: big art (click it to play / pause), up-next list, background tinted from the album art
+  (click the player bar)
+- Right-click any song (rows, cards, the queue, the player) to play next, add to queue or a playlist, start a radio,
+  copy the link, or open it in the big player
 - Queue with autoplay radio, shuffle, and repeat off / all / one
-- **Mini player**: compact, always on top. It has a drawer for Up next, Search and Library that hides itself when
-  you move away. Drag it to a screen edge and it tucks away to a small cover tab.
+- **Mini player**: compact, always on top, with play / pause on the cover plus shuffle and repeat. It has a drawer
+  for Up next, Search and Library that hides itself when you move away. Drag it to a screen edge and it tucks
+  away to a small cover tab.
+- **Performance** setting with three choices:
+  - *Less memory* (the default) draws with the processor and saves about 40 MB.
+  - *Standard* draws with the graphics card.
+  - *Smooth* adds eased scrolling, sliding pages and dialogs, fading highlights, a gliding progress bar and smoother
+    mini player motion, at your screen's refresh rate.
 - Your library: like songs, create and delete playlists, add songs to playlists and remove them
 - **No account needed**: signed out, likes and playlists are kept on this PC (tagged *Local*). Signed in, when you
   create a playlist you choose YouTube Music or this PC.
@@ -69,10 +84,12 @@ Cookies are stored encrypted (DPAPI, your Windows account only) in `%LocalAppDat
 
 ## Keeping it light
 
-- Audio only (`video=no`), with a small 8 MiB mpv demuxer cache
+- Audio only (`video=no`), with a small mpv demuxer cache (3 MiB ahead, 1 MiB behind)
+- Drawn with the processor by default (*Less memory*), which skips the graphics driver's ~40 MB per-process cost
 - Thumbnails are fetched and decoded at display size, in a bounded cache
 - Virtualized lists, and a workstation non-concurrent GC
-- Minimizing to the tray or switching to the mini player releases the main UI tree and compacts the heap
+- Minimizing, closing to the tray or switching to the mini player releases memory: the main UI tree is dropped
+  (tray / mini player), the heap is compacted and the working set is trimmed
 
 ## Building from source
 
