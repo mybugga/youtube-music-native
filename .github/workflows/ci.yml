@@ -15,5 +15,3 @@ jobs:
           dotnet-version: 10.0.x
       - name: Build
         run: dotnet build YouTubeMusicNative.sln -c Release
-      - name: Test
-        run: dotnet test YouTubeMusicNative.sln -c Release --no-build

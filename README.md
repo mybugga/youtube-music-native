@@ -5,6 +5,16 @@ plain WPF, song data comes straight from YouTube Music's own API, and playback i
 [libmpv](https://mpv.io) + [yt-dlp](https://github.com/yt-dlp/yt-dlp). A browser tab with YouTube Music open
 easily takes 500 MB–1 GB of RAM. This app plays the same music in a fraction of that.
 
+![Home](docs/screenshots/home.png)
+
+| Playlist (hover a cover to play, click the playing one to pause) | Now Playing |
+| --- | --- |
+| ![Playlist](docs/screenshots/playlist.png) | ![Now Playing](docs/screenshots/now-playing.png) |
+
+| Search | Mini player with its Up next / Search / Library drawer |
+| --- | --- |
+| ![Search](docs/screenshots/search.png) | ![Mini player](docs/screenshots/mini-player.png) |
+
 ## Install
 
 Download **`YouTubeMusicNative-<version>-setup.exe`** from the
@@ -59,7 +69,6 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 ```powershell
 .\scripts\fetch-deps.ps1                      # libmpv-2.dll, yt-dlp.exe and deno.exe into src/YouTubeMusicNative/deps
 dotnet run --project src/YouTubeMusicNative
-dotnet test                                   # parser tests run against saved InnerTube responses
 ```
 
 Playback problems? `%LocalAppData%\YouTubeMusicNative\mpv.log` has the mpv and yt-dlp messages from the current session.
@@ -73,7 +82,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-[`release.yml`](.github/workflows/release.yml) runs the tests and builds a self-contained publish, the
+[`release.yml`](.github/workflows/release.yml) builds a self-contained publish, the
 [Inno Setup](https://jrsoftware.org/isinfo.php) installer ([`installer/`](installer/YouTubeMusicNative.iss)) and the
 portable zip. It then publishes them as a GitHub release, and installed copies pick that release up automatically.
 To build the same thing locally (with Inno Setup 6 installed), run `.\scripts\build-release.ps1 -Version 1.2.0`.

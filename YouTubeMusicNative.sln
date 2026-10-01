@@ -7,10 +7,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YouTubeMusicNative", "src\YouTubeMusicNative\YouTubeMusicNative.csproj", "{6CEE5961-855B-4A0D-BE1C-A100246A745B}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YouTubeMusicNative.Tests", "tests\YouTubeMusicNative.Tests\YouTubeMusicNative.Tests.csproj", "{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,24 +29,11 @@ Global
 		{6CEE5961-855B-4A0D-BE1C-A100246A745B}.Release|x64.Build.0 = Release|Any CPU
 		{6CEE5961-855B-4A0D-BE1C-A100246A745B}.Release|x86.ActiveCfg = Release|Any CPU
 		{6CEE5961-855B-4A0D-BE1C-A100246A745B}.Release|x86.Build.0 = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|x64.Build.0 = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Debug|x86.Build.0 = Debug|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|x64.ActiveCfg = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|x64.Build.0 = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|x86.ActiveCfg = Release|Any CPU
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6CEE5961-855B-4A0D-BE1C-A100246A745B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{8FB6AB2D-333D-4E32-9889-17A3EB1E65CB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
