@@ -397,7 +397,7 @@
 
         <!-- Handle shown while tucked against a screen edge: the window shrinks to this square and only it is on
              screen. Just the cover, with a thin progress line; dimmed with a play mark while paused. Hover to slide out. -->
-        <Grid x:Name="Tab" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Top" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
+        <Grid x:Name="Tab" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Center" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
               Background="{StaticResource Elevated}" ToolTip="{Binding Playback.NowPlaying.Title}">
             <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="16" Foreground="{StaticResource TextFaint}"/>
             <Rectangle>

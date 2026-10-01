@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using YouTubeMusicNative.Services;
 using YouTubeMusicNative.ViewModels;
@@ -38,6 +39,7 @@ public partial class MiniPlayerWindow : Window
     private bool _drawerOpen;
     private EventHandler? _slide;
     private Action? _finishSlide; // jumps a running tuck / reveal move to its end
+    private Window? _tabWindow;   // the small cover tile shown at the screen edge while tucked
     private readonly MiniPanelViewModel _panel;
     private Dock _dock;
     private bool _tucked;
@@ -117,7 +119,6 @@ public partial class MiniPlayerWindow : Window
         if (_dock != Dock.None) _hideTimer.Start();
     }, DispatcherPriority.Background);
     private double _shiftedUp; // how far the window moved up to fit the open drawer on screen
-    private double _fullHeight, _fullTop; // size/position to restore when sliding out of the tucked handle
 
     /// <summary>The user wants the full window back.</summary>
     public event Action? ExpandRequested;
@@ -180,6 +181,7 @@ public partial class MiniPlayerWindow : Window
             if (_dock != Dock.None && !IsMouseOver && !IsHeld && !SearchInput.IsKeyboardFocused) Tuck(animate: true);
         };
 
+        CreateTabWindow();
         SourceInitialized += (_, _) =>
         {
             MainWindow.ApplyWindowFrame(new WindowInteropHelper(this).Handle);
@@ -195,25 +197,23 @@ public partial class MiniPlayerWindow : Window
         _revealTimer.Tick += (_, _) =>
         {
             _revealTimer.Stop();
-            if (_dock != Dock.None && _tucked && IsMouseOver) Reveal();
+            if (_dock != Dock.None && _tucked && _tabWindow!.IsMouseOver) Reveal();
         };
         MouseEnter += (_, _) =>
         {
             _hideTimer.Stop();
             _drawerHideTimer.Stop();
             if (!_tucked && _panel.IsExpanded && !_drawerOpen) _drawerShowTimer.Start();
-            if (_dock != Dock.None && _tucked) _revealTimer.Start();
         };
         MouseLeave += (_, _) =>
         {
-            _revealTimer.Stop();
             _drawerShowTimer.Stop();
             if (_drawerOpen && !_tucked) _drawerHideTimer.Start();
             if (_dock != Dock.None) _hideTimer.Start();
         };
         LocationChanged += (_, _) =>
         {
-            if (_tucked) return; // the handle's position isn't the player's
+            if (_tucked || _slide is not null) return; // parked off screen / still sliding
             if (_dock == Dock.None) _store.Settings.MiniLeft = Left;
             _store.Settings.MiniTop = Top;
         };
@@ -238,6 +238,12 @@ public partial class MiniPlayerWindow : Window
             _drawerShowTimer.Stop();
             StopTween(ref _slide);
             StopTween(ref _resize);
+            _tabWindow?.Close();
+        };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible) _tabWindow?.Hide();
+            else if (_tucked) ShowTab(true);
         };
     }
 
@@ -250,20 +256,32 @@ public partial class MiniPlayerWindow : Window
         _hideTimer.Stop();
         _revealTimer.Stop();
 
-        // Grabbing the tucked tile: turn back into the full player right under the pointer (cover centred on
-        // it) so the user drags the real thing, not a 52px strip.
-        if (_tucked)
-        {
-            var grab = e.GetPosition(this);
-            _tucked = false;
-            ShowTab(false);
-            Height = _fullHeight;
-            Left += grab.X - 68;
-            Top += grab.Y - 68;
-        }
-
         DragMove(); // returns when the mouse is released
+        AfterDrag();
+    }
 
+    /// <summary>Grabbing the tab: the full player comes back right under the pointer (cover centred on it) to be dragged.</summary>
+    private void OnTabMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
+        e.Handled = true;
+        CompleteSlide();
+        _hideTimer.Stop();
+        _revealTimer.Stop();
+        var pointer = _tabWindow!.PointToScreen(e.GetPosition(_tabWindow));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        _tucked = false;
+        ShowTab(false);
+        Left = pointer.X / dpi.DpiScaleX - 68;
+        Top = pointer.Y / dpi.DpiScaleY - 68;
+        SetCloaked(false);
+        Activate();
+        DragMove();
+        AfterDrag();
+    }
+
+    private void AfterDrag()
+    {
         // Where was it dropped?
         var area = WorkArea();
         if (Left <= area.Left + SnapDistance) SetDock(Dock.Left, tuck: true, animate: true);
@@ -278,14 +296,11 @@ public partial class MiniPlayerWindow : Window
         if (dock == Dock.None)
         {
             ShowTab(false);
-            if (_tucked) Height = _fullHeight;
+            SetCloaked(false);
             _tucked = false;
             _store.Settings.MiniLeft = Left;
             return;
         }
-
-        // The tab sits on the side that stays on screen; its accent faces the screen's interior.
-        Tab.HorizontalAlignment = dock == Dock.Right ? HorizontalAlignment.Left : HorizontalAlignment.Right;
 
         var area = WorkArea();
         Top = Math.Clamp(Top, area.Top, area.Bottom - Height);
@@ -293,29 +308,23 @@ public partial class MiniPlayerWindow : Window
         else Reveal();
     }
 
+    // Tucked: the player slides fully off the screen edge and is hidden there (cloaked, so it stays drawn and up to
+    // date), and a separate small tab window sits at the edge. Revealing hides the tab and slides the ready-drawn player
+    // back out. The player window itself is never resized or cut, so nothing has to be redrawn on the way.
     private void Tuck(bool animate)
     {
         var area = WorkArea();
-        double target = _dock == Dock.Right ? area.Right - TabWidth : area.Left - Width + TabWidth;
+        double parked = _dock == Dock.Right ? area.Right : area.Left - Width;
         if (!_tucked)
         {
             _drawerHideTimer.Stop();
             _drawerShowTimer.Stop();
             if (_drawerOpen) SetDrawer(false, animate: false);
             CompleteSlide();
-            _fullHeight = Height;
-            _fullTop = Top;
             _tucked = true;
         }
-        // Slide off the edge at full size, then shrink to a square handle centred on where the player was.
-        double tabTop = Math.Clamp(_fullTop + (_fullHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
-        SlideTo(target, animate ? 200 : 0, Motion.EaseOut, done: () =>
-        {
-            if (!_tucked) return;
-            Height = TabHeight;
-            Top = tabTop;
-            ShowTab(true);
-        });
+        ShowTab(true);
+        SlideTo(parked, animate ? 200 : 0, Motion.EaseOut, done: () => { if (_tucked) SetCloaked(true); });
     }
 
     private void Reveal()
@@ -324,12 +333,77 @@ public partial class MiniPlayerWindow : Window
         double target = _dock == Dock.Right ? area.Right - Width : area.Left;
         CompleteSlide();
         _tucked = false;
-        // Back to full size right at the edge, then slide out with a little spring at the end.
         ShowTab(false);
-        Height = _fullHeight;
-        Top = Math.Clamp(_fullTop, area.Top, Math.Max(area.Top, area.Bottom - _fullHeight));
-        SlideTo(target, 340, Spring);
+        SetCloaked(false);
+        SlideTo(target, 340, Spring, done: () =>
+        {
+            // Came out without the pointer on it (or it moved off during the slide): tuck again after the usual delay.
+            if (!_tucked && _dock != Dock.None && !PointerOverWindow() && !IsHeld) _hideTimer.Start();
+        });
         if (_panel.IsExpanded && !_drawerOpen) _drawerShowTimer.Start();
+    }
+
+    /// <summary>Hides / shows the window without unmapping it: a cloaked window keeps being drawn, just not shown.</summary>
+    private void SetCloaked(bool cloaked)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        int value = cloaked ? 1 : 0;
+        DwmSetWindowAttribute(hwnd, DwmwaCloak, ref value, sizeof(int));
+    }
+
+    private bool PointerOverWindow()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        return hwnd != IntPtr.Zero && GetCursorPos(out var p) && GetWindowRect(hwnd, out var r)
+               && p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom;
+    }
+
+    /// <summary>The cover tile at the screen edge: the Tab element from the XAML, moved into its own small window.</summary>
+    private void CreateTabWindow()
+    {
+        ((Panel)Tab.Parent).Children.Remove(Tab);
+        Tab.Visibility = Visibility.Visible;
+        Tab.HorizontalAlignment = HorizontalAlignment.Stretch;
+        Tab.VerticalAlignment = VerticalAlignment.Stretch;
+        _tabWindow = new Window
+        {
+            Width = TabWidth, Height = TabHeight, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false, Topmost = true, ShowActivated = false, Background = Brushes.Black,
+            DataContext = DataContext, Content = Tab, Title = "YouTube Music Native mini player tab",
+        };
+        WindowChrome.SetWindowChrome(_tabWindow, new WindowChrome
+        {
+            CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(0),
+        });
+        _tabWindow.SourceInitialized += (_, _) => MainWindow.ApplyWindowFrame(new WindowInteropHelper(_tabWindow).Handle);
+        _tabWindow.MouseEnter += (_, _) =>
+        {
+            _hideTimer.Stop();
+            if (_tucked) _revealTimer.Start();
+        };
+        _tabWindow.MouseLeave += (_, _) => _revealTimer.Stop();
+        _tabWindow.MouseLeftButtonDown += OnTabMouseDown;
+    }
+
+    private void ShowTab(bool show)
+    {
+        if (_tabWindow is null) return;
+        if (!show)
+        {
+            _tabWindow.Hide();
+            return;
+        }
+        if (!IsVisible)
+        {
+            // Docked at startup, before this window is on screen: show the tab once it is.
+            Dispatcher.BeginInvoke(() => { if (_tucked && IsVisible) ShowTab(true); }, DispatcherPriority.Loaded);
+            return;
+        }
+        var area = WorkArea();
+        _tabWindow.Left = _dock == Dock.Right ? area.Right - TabWidth : area.Left;
+        _tabWindow.Top = Math.Clamp(Top + (CompactHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
+        _tabWindow.Show();
     }
 
     /// <summary>Ease-out that overshoots slightly and settles back (a small bounce).</summary>
@@ -338,8 +412,6 @@ public partial class MiniPlayerWindow : Window
         const double c = 1.35;
         return 1 + (c + 1) * Math.Pow(p - 1, 3) + c * Math.Pow(p - 1, 2);
     }
-
-    private void ShowTab(bool show) => Tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Peek out for a moment when the song changes while tucked away.</summary>
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
@@ -550,6 +622,17 @@ public partial class MiniPlayerWindow : Window
     }
 
     private const uint SwpNoZOrder = 0x0004, SwpNoActivate = 0x0010;
+
+    private const int DwmwaCloak = 13;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X, Y; }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint point);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
