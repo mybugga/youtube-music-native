@@ -32,6 +32,13 @@ public sealed class NullToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>Inverts a bool.</summary>
+public sealed class NotConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
+}
+
 /// <summary>Picks a glyph from a bool: ConverterParameter "trueGlyph|falseGlyph".</summary>
 public sealed class BoolToGlyphConverter : IValueConverter
 {

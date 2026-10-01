@@ -26,6 +26,9 @@ public sealed class AppSettings
 
     /// <summary>Draw with the CPU instead of the GPU: ~40 MB less memory for a little more CPU. Applies on restart.</summary>
     public bool LowMemoryRendering { get; set; } = true;
+
+    /// <summary>Eased scrolling, page / dialog transitions and fading hovers; also draws with the GPU at the display's refresh rate.</summary>
+    public bool SmoothAnimations { get; set; }
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
     /// <summary>"Left"/"Right" when the mini player is docked (tucked) against that screen edge.</summary>

@@ -21,7 +21,7 @@
             </Grid.ColumnDefinitions>
             <Button Style="{StaticResource CardButton}" Padding="0" ToolTip="Now playing view" Command="{Binding ToggleNowPlayingCommand}">
                 <Grid Width="56" Height="56">
-                    <Border Style="{StaticResource Art}">
+                    <Border Style="{StaticResource Art}" v:Motion.AnimateOnChange="{Binding Playback.NowPlaying}">
                         <Border.Background>
                             <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=56}" Stretch="UniformToFill"/>
                         </Border.Background>

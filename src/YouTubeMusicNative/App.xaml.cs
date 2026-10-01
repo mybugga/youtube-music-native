@@ -47,7 +47,11 @@ public partial class App : Application
         _store = new SettingsStore();
         _store.Load();
         // Software rendering skips the GPU driver's per-process memory (~40 MB); must be set before any window.
-        if (_store.Settings.LowMemoryRendering)
+        // Smooth animations need the GPU (software drawing can't keep up with per-frame animation) and the display's frame rate.
+        Views.Motion.Enabled = _store.Settings.SmoothAnimations;
+        if (Views.Motion.Enabled)
+            Views.Motion.UseDisplayFrameRate();
+        else if (_store.Settings.LowMemoryRendering)
             System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         if (UpdateService.InstallPendingAtStartup(_store))
         {

@@ -225,10 +225,21 @@
                         <Border Height="1" Background="#1AFFFFFF"/>
                         <DockPanel Margin="0,14">
                             <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding SmoothAnimations}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Smooth animations" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Eased scrolling, sliding pages and dialogs, fading highlights and a smoothly moving progress bar, drawn by the graphics card at your screen's refresh rate. Uses about 40 MB more memory; the full effect applies the next time the app starts."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14"
+                                   IsEnabled="{Binding SmoothAnimations, Converter={StaticResource Not}}">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
                                           IsChecked="{Binding LowMemoryRendering}"/>
                             <StackPanel Margin="0,0,24,0">
                                 <TextBlock Text="Use less memory" FontWeight="SemiBold" FontSize="14"/>
-                                <TextBlock Text="Draws the app with the processor instead of the graphics card, which saves about 40 MB. Turn it off if animations aren't smooth. Applies the next time the app starts."
+                                <TextBlock Text="Draws the app with the processor instead of the graphics card, which saves about 40 MB. Not used while smooth animations are on. Applies the next time the app starts."
                                            Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
                             </StackPanel>
                         </DockPanel>

@@ -62,8 +62,23 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>Music that was playing when the app closed starts again at the next launch.</summary>
     /// <summary>Settings: software rendering to save memory (takes effect the next time the app starts).</summary>
+    /// <summary>Settings: smooth animations. The motion itself switches live; GPU drawing at full refresh rate applies on restart.</summary>
+    public bool SmoothAnimations
+    {
+        get => _store.Settings.SmoothAnimations;
+        set
+        {
+            if (_store.Settings.SmoothAnimations == value) return;
+            _store.Settings.SmoothAnimations = value;
+            _store.Save();
+            Views.Motion.Enabled = value;
+            OnPropertyChanged();
+            if (_store.Settings.LowMemoryRendering)
+                Playback.ShowStatus(value ? "Restart the app for the smoothest animations" : "Restart the app to use less memory again");
+        }
+    }
+
     public bool LowMemoryRendering
     {
         get => _store.Settings.LowMemoryRendering;

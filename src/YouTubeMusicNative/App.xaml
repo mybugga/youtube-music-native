@@ -45,6 +45,7 @@
         <s:ColorToBrushConverter x:Key="ColorBrush"/>
         <s:IndexConverter x:Key="Index"/>
         <s:TrackNumberConverter x:Key="TrackNumber"/>
+        <s:NotConverter x:Key="Not"/>
         <BooleanToVisibilityConverter x:Key="BoolVis"/>
 
         <!-- ================================================================ Text -->
@@ -365,13 +366,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
-                        </Border>
+                        <Grid>
+                            <Border CornerRadius="8" Background="{StaticResource RowHover}" v:Motion.HoverOverlay="True"/>
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHover}"/>
-                            </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowSelected}"/>
                             </Trigger>
@@ -386,14 +387,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Stretch"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHover}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
+                        <Grid>
+                            <Border CornerRadius="6" Background="{TemplateBinding Background}"/>
+                            <Border CornerRadius="6" Background="{StaticResource RowHover}" v:Motion.HoverOverlay="True"/>
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Stretch"/>
+                            </Border>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -523,6 +523,11 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Eased mouse-wheel scrolling everywhere (only active with the Smooth animations setting) -->
+        <Style TargetType="ScrollViewer">
+            <Setter Property="v:Motion.SmoothScroll" Value="True"/>
+        </Style>
+
         <!-- ================================================================ Lists -->
         <Style x:Key="TrackItem" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{StaticResource Text}"/>
@@ -531,13 +536,13 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6">
-                            <ContentPresenter/>
-                        </Border>
+                        <Grid>
+                            <Border CornerRadius="6" Background="{StaticResource RowHover}" v:Motion.HoverOverlay="True"/>
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="6">
+                                <ContentPresenter/>
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHover}"/>
-                            </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowSelected}"/>
                             </Trigger>

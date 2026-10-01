@@ -141,7 +141,7 @@
             <!-- Main page -->
             <Border Grid.Column="1" Background="{StaticResource Panel}" CornerRadius="8" v:RoundedClip.Radius="8">
                 <Grid>
-                    <ContentControl Content="{Binding CurrentPage}" Focusable="False"/>
+                    <ContentControl Content="{Binding CurrentPage}" Focusable="False" v:Motion.PageTransition="True"/>
 
                     <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,20"
                             Background="#F2FFFFFF" CornerRadius="8" Padding="16,10" MaxWidth="560"
@@ -209,7 +209,7 @@
             </Grid.InputBindings>
             <Border Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24"
                     Background="{StaticResource Elevated}" CornerRadius="12" Padding="24,20,24,22"
-                    MouseLeftButtonDown="OnDialogCardClick">
+                    MouseLeftButtonDown="OnDialogCardClick" v:Motion.PopIn="True">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="40" ShadowDepth="6" Opacity="0.6" RenderingBias="Performance"/>
                 </Border.Effect>

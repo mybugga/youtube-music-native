@@ -103,7 +103,7 @@
                     </Border.Effect>
                     <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="30" Foreground="{StaticResource TextFaint}"/>
                 </Border>
-                <Border CornerRadius="8">
+                <Border CornerRadius="8" v:Motion.AnimateOnChange="{Binding Playback.NowPlaying}">
                     <Border.Background>
                         <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=108}" Stretch="UniformToFill"/>
                     </Border.Background>
@@ -436,7 +436,7 @@
                 <KeyBinding Key="Escape" Command="{Binding CloseDialogCommand}"/>
             </Grid.InputBindings>
             <Border VerticalAlignment="Top" Margin="10" Background="{StaticResource Elevated}" CornerRadius="12"
-                    BorderBrush="#1FFFFFFF" BorderThickness="1" MouseLeftButtonDown="OnDialogCardClick">
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" MouseLeftButtonDown="OnDialogCardClick" v:Motion.PopIn="True">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,16,20,18">
                     <ContentControl Content="{Binding Dialog}" Focusable="False"/>
                 </ScrollViewer>

@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using YouTubeMusicNative.Services;
 
 namespace YouTubeMusicNative.Views;
@@ -24,6 +26,11 @@ internal sealed class SeekBar
     private PlaybackService? _playback;
     private bool _dragging;
 
+    // Smooth animations: the player reports its position twice a second; in between, the knob glides on the clock.
+    private double _basePosition;
+    private long _baseTime;
+    private bool _ticking;
+
     public SeekBar(Slider slider, TextBlock? positionText)
     {
         _slider = slider;
@@ -33,6 +40,7 @@ internal sealed class SeekBar
         slider.AddHandler(UIElement.PreviewMouseMoveEvent, new MouseEventHandler(OnMove), handledEventsToo: true);
         slider.LostMouseCapture += OnLostCapture;
         slider.ValueChanged += (_, _) => { if (_dragging) ShowTime(_slider.Value); };
+        slider.IsVisibleChanged += (_, _) => UpdateTicking();
     }
 
     public void Attach(PlaybackService? playback)
@@ -49,6 +57,7 @@ internal sealed class SeekBar
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(PlaybackService.Position) or nameof(PlaybackService.Duration)) Follow();
+        else if (e.PropertyName is nameof(PlaybackService.IsPaused) or nameof(PlaybackService.IsBuffering)) UpdateTicking();
     }
 
     /// <summary>Mirror the playback position unless the user is holding the bar.</summary>
@@ -58,8 +67,36 @@ internal sealed class SeekBar
         // Max >= 1 so an unknown duration (0) shows an empty bar rather than a full one.
         _slider.Maximum = Math.Max(1, _playback.Duration);
         // Unknown length (e.g. a restored home-feed song before it loads): keep the bar empty, not full.
-        _slider.Value = _playback.Duration > 0 ? _playback.Position : 0;
+        double position = _playback.Duration > 0 ? _playback.Position : 0;
+        if (_ticking)
+        {
+            // Ease toward the reported position instead of snapping back and forth around it.
+            double predicted = Predicted();
+            if (Math.Abs(position - predicted) < 0.4) position = predicted + (position - predicted) * 0.3;
+        }
+        _basePosition = position;
+        _baseTime = Stopwatch.GetTimestamp();
+        _slider.Value = position;
         ShowTime(_playback.Position);
+        UpdateTicking();
+    }
+
+    private double Predicted() =>
+        _basePosition + Math.Min(Stopwatch.GetElapsedTime(_baseTime).TotalSeconds, 1.5);
+
+    private void UpdateTicking()
+    {
+        bool want = Motion.Enabled && _playback is { IsPaused: false, IsBuffering: false, Duration: > 0 } && _slider.IsVisible;
+        if (want == _ticking) return;
+        _ticking = want;
+        if (want) CompositionTarget.Rendering += OnFrame;
+        else CompositionTarget.Rendering -= OnFrame;
+    }
+
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        if (_dragging || _playback is null) return;
+        _slider.Value = Math.Min(Predicted(), _playback.Duration);
     }
 
     private void ShowTime(double seconds)

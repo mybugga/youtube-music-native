@@ -37,7 +37,7 @@
                         </Border.Effect>
                         <Grid>
                             <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="96" Foreground="{StaticResource TextFaint}"/>
-                            <Border CornerRadius="10">
+                            <Border CornerRadius="10" v:Motion.AnimateOnChange="{Binding Playback.NowPlaying}">
                                 <Border.Background>
                                     <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=480}"
                                                 Stretch="UniformToFill"/>
