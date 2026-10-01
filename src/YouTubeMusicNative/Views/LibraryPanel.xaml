@@ -58,6 +58,8 @@
                         Visibility="{Binding Library.IsLoggedIn, Converter={StaticResource BoolVis}}"/>
                 <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="15"
                         ToolTip="Create playlist" Command="{Binding CreatePlaylistCommand}" Margin="0,0,2,0"/>
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE8B5;" FontSize="15"
+                        ToolTip="Import playlist from file" Command="{Binding ImportPlaylistCommand}" Margin="0,0,2,0"/>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE8F1;" Style="{StaticResource Glyph}" FontSize="20" Foreground="{StaticResource TextDim}"/>
                     <TextBlock Text="Your Library" FontSize="16" FontWeight="Bold" Margin="12,0,0,0" VerticalAlignment="Center"
@@ -107,6 +109,31 @@
                                     <MenuItem Header="Remove from your library" Tag="&#xE738;" CommandParameter="{Binding}"
                                               Command="{Binding PlacementTarget.Tag.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               Visibility="{Binding CanRemoveFromLibrary, Converter={StaticResource BoolVis}}"/>
+                                    <Separator/>
+                                    <MenuItem Header="Copy to this PC" Tag="&#xE977;" CommandParameter="{Binding}"
+                                              Command="{Binding PlacementTarget.Tag.CopyToLocalCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              Visibility="{Binding IsLocal, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                                    <MenuItem Header="Upload to YouTube Music" Tag="&#xE898;" CommandParameter="{Binding}"
+                                              Command="{Binding PlacementTarget.Tag.UploadToYouTubeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                        <MenuItem.Style>
+                                            <!-- Only for a local playlist while signed in -->
+                                            <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsLocal}" Value="True"/>
+                                                            <Condition Value="True"
+                                                                       Binding="{Binding PlacementTarget.Tag.Library.IsLoggedIn, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </MenuItem.Style>
+                                    </MenuItem>
+                                    <MenuItem Header="Export to file…" Tag="&#xE78C;" CommandParameter="{Binding}"
+                                              Command="{Binding PlacementTarget.Tag.ExportPlaylistCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
                                 </ContextMenu>
                             </Button.ContextMenu>
                             <Grid>

@@ -67,7 +67,11 @@ public sealed class LocalLibrary
         return existing < 0;
     }
 
-    public LocalPlaylist Create(string title, string description, Track? firstSong)
+    public LocalPlaylist Create(string title, string description, Track? firstSong) =>
+        Create(title, description, firstSong is null ? Array.Empty<Track>() : new[] { firstSong });
+
+    /// <summary>A new playlist with these songs (a copied or imported one); repeated songs are kept once.</summary>
+    public LocalPlaylist Create(string title, string description, IEnumerable<Track> songs)
     {
         var playlist = new LocalPlaylist
         {
@@ -75,11 +79,20 @@ public sealed class LocalLibrary
             Title = title,
             Description = description,
             Created = DateTime.UtcNow,
+            Tracks = songs.DistinctBy(t => t.VideoId).Select(Clean).ToList(),
         };
-        if (firstSong is not null) playlist.Tracks.Add(Clean(firstSong));
         _data.Playlists.Insert(0, playlist);
         Save();
         return playlist;
+    }
+
+    /// <summary>The title, or "title (2)", "title (3)"… if a local playlist already has it.</summary>
+    public string UniqueTitle(string title)
+    {
+        var taken = _data.Playlists.Select(p => p.Title).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!taken.Contains(title)) return title;
+        for (int n = 2; ; n++)
+            if (!taken.Contains($"{title} ({n})")) return $"{title} ({n})";
     }
 
     public LocalPlaylist? Find(string id) => _data.Playlists.FirstOrDefault(p => p.Id == id);

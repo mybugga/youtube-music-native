@@ -1,3 +1,5 @@
+using System.IO;
+using System.Net.Http;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -358,20 +360,146 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ShowCreatePlaylist(Track? firstSong) =>
         Dialog = new CreatePlaylistDialog(_api, Local, firstSong, () => Dialog = null, (id, title, isLocal) =>
+            OnPlaylistCreated(id, title, isLocal, firstSong?.ThumbnailUrl,
+                firstSong is null ? $"Created {title}" : $"Created {title} with \"{firstSong.Title}\""));
+
+    /// <summary>The playlist dialog starting with a whole list of songs (an imported file, or a local playlist to upload).</summary>
+    private void ShowPlaylistDialog(PlaylistDialogMode mode, IReadOnlyList<Track> songs, string title, string description) =>
+        Dialog = new CreatePlaylistDialog(_api, Local, null, () => Dialog = null, (id, created, isLocal) =>
+            OnPlaylistCreated(id, created, isLocal, songs.FirstOrDefault()?.ThumbnailUrl,
+                (mode == PlaylistDialogMode.Upload ? $"Uploaded {created} to YouTube Music" : $"Imported {created}")
+                + $" ({SongCount(songs.Count)})"),
+            mode, songs, title, description);
+
+    private void OnPlaylistCreated(string id, string title, bool isLocal, string? art, string message)
+    {
+        Playback.ShowStatus(message);
+        if (isLocal)
         {
-            Playback.ShowStatus(firstSong is null ? $"Created {title}" : $"Created {title} with \"{firstSong.Title}\"");
-            if (isLocal)
-            {
-                // Your Library lists it already (LocalLibrary.Changed).
-                OpenPlaylist(Library.Playlists.FirstOrDefault(p => p.BrowseId == id)
-                             ?? new PlaylistInfo(id, title, "Playlist", firstSong?.ThumbnailUrl) { Source = PlaylistSource.Local });
-                return;
-            }
-            var info = new PlaylistInfo("VL" + id, title, "Playlist", firstSong?.ThumbnailUrl) { IsOwned = true };
-            // YouTube takes a moment to list a new playlist, so show it in the sidebar right away.
-            Library.AddRemote(info);
-            OpenPlaylist(info);
+            // Your Library lists it already (LocalLibrary.Changed).
+            OpenPlaylist(Library.Playlists.FirstOrDefault(p => p.BrowseId == id)
+                         ?? new PlaylistInfo(id, title, "Playlist", art) { Source = PlaylistSource.Local });
+            return;
+        }
+        var info = new PlaylistInfo("VL" + id, title, "Playlist", art) { IsOwned = true };
+        // YouTube takes a moment to list a new playlist, so show it in the sidebar right away.
+        Library.AddRemote(info);
+        OpenPlaylist(info);
+    }
+
+    private static string SongCount(int count) => count == 1 ? "1 song" : $"{count} songs";
+
+    // ---- Copy / export / import playlists ------------------------------------------------------
+
+    private bool _isTransferring;
+
+    private static PlaylistInfo? InfoOf(object? parameter) => parameter switch
+    {
+        PlaylistViewModel page => page.Info,
+        PlaylistInfo p => p,
+        _ => null,
+    };
+
+    /// <summary>Every song of a playlist: a local one from this PC, a YouTube one from YouTube (the saved copy when offline).</summary>
+    private async Task<IReadOnlyList<Track>> LoadAllSongsAsync(PlaylistInfo info)
+    {
+        if (LocalLibrary.IsLocalId(info.BrowseId)) return Local.TracksOf(info.BrowseId);
+        try
+        {
+            var tracks = await _api.GetAllPlaylistTracksAsync(info.BrowseId);
+            // Album rows carry no art or album name of their own.
+            return info.KindLabel != "Album" ? tracks
+                : tracks.Select(t => t with { ThumbnailUrl = t.ThumbnailUrl ?? info.ThumbnailUrl, Album = t.Album ?? info.Title }).ToList();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && Cache.TracksOf(info.BrowseId) is not null)
+        {
+            return Cache.TracksOf(info.BrowseId)!;
+        }
+    }
+
+    /// <summary>Runs a copy / export with a status message, one at a time; failures end up in the status bar.</summary>
+    private async Task TransferAsync(string busyMessage, Func<Task> work)
+    {
+        if (_isTransferring) return;
+        _isTransferring = true;
+        Playback.ShowStatus(busyMessage);
+        try
+        {
+            await work();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException)
+        {
+            Playback.ShowStatus(ex is TaskCanceledException ? "Request timed out." : ex.Message);
+        }
+        finally
+        {
+            _isTransferring = false;
+        }
+    }
+
+    /// <summary>Saves a playlist's songs to a .json file. Parameter: a PlaylistInfo (sidebar) or PlaylistViewModel (page).</summary>
+    [RelayCommand]
+    private async Task ExportPlaylistAsync(object? parameter)
+    {
+        if (InfoOf(parameter) is not { } info) return;
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export playlist",
+            FileName = PlaylistFile.FileNameFor(info.Title),
+            DefaultExt = ".json",
+            Filter = "Playlist (*.json)|*.json",
+        };
+        if (dlg.ShowDialog() != true) return;
+        await TransferAsync($"Exporting {info.Title}…", async () =>
+        {
+            var songs = await LoadAllSongsAsync(info);
+            PlaylistFile.Write(dlg.FileName, info.Title, Local.Find(info.BrowseId)?.Description ?? "", songs);
+            Playback.ShowStatus($"Exported {info.Title} ({SongCount(songs.Count)})");
         });
+    }
+
+    /// <summary>Copies a YouTube playlist (or album) to a new playlist on this PC.</summary>
+    [RelayCommand]
+    private async Task CopyToLocalAsync(object? parameter)
+    {
+        if (InfoOf(parameter) is not { } info || LocalLibrary.IsLocalId(info.BrowseId)) return;
+        await TransferAsync($"Copying {info.Title} to this PC…", async () =>
+        {
+            var songs = await LoadAllSongsAsync(info);
+            var copy = Local.Create(Local.UniqueTitle(info.Title), "", songs);
+            Playback.ShowStatus($"Copied {info.Title} to this PC ({SongCount(copy.Tracks.Count)})");
+            OpenPlaylist(Library.Playlists.FirstOrDefault(p => p.BrowseId == copy.Id)
+                         ?? new PlaylistInfo(copy.Id, copy.Title, "Playlist", copy.Tracks.FirstOrDefault()?.ThumbnailUrl) { Source = PlaylistSource.Local });
+        });
+    }
+
+    /// <summary>Makes a YouTube Music playlist from a local one (asks for the title and privacy first).</summary>
+    [RelayCommand]
+    private void UploadToYouTube(object? parameter)
+    {
+        if (InfoOf(parameter) is not { } info || !LocalLibrary.IsLocalId(info.BrowseId) || !IsLoggedIn) return;
+        ShowPlaylistDialog(PlaylistDialogMode.Upload, Local.TracksOf(info.BrowseId).ToList(), info.Title,
+            Local.Find(info.BrowseId)?.Description ?? "");
+    }
+
+    /// <summary>Reads an exported .json playlist, then asks where to put it (this PC or YouTube Music).</summary>
+    [RelayCommand]
+    private void ImportPlaylist()
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Import playlist", Filter = "Playlist (*.json)|*.json" };
+        if (dlg.ShowDialog() != true) return;
+        PlaylistFile file;
+        try
+        {
+            file = PlaylistFile.Read(dlg.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            Playback.ShowStatus(ex.Message);
+            return;
+        }
+        ShowPlaylistDialog(PlaylistDialogMode.Import, file.Tracks, file.Title, file.Description);
+    }
 
     private void ShowAddToPlaylist(Track track)
     {

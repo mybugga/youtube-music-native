@@ -89,18 +89,47 @@ public sealed partial class AddToPlaylistDialog(
     private void NewPlaylist() => newPlaylist(Track);
 }
 
+/// <summary>How the playlist dialog was opened: a new empty playlist, an imported file, or a local playlist going to YouTube.</summary>
+public enum PlaylistDialogMode { Create, Import, Upload }
+
 /// <summary>
 /// "New playlist": where (on this PC or on YouTube Music, when signed in), title, description, privacy;
-/// optionally starts with a song. <c>created(id, title, isLocal)</c>.
+/// optionally starts with a song, or with a whole list of songs (Import / Upload to YouTube Music).
+/// <c>created(id, title, isLocal)</c>.
 /// </summary>
 public sealed partial class CreatePlaylistDialog(
-    InnerTubeClient api, LocalLibrary local, Track? firstSong, Action close, Action<string, string, bool> created)
+    InnerTubeClient api, LocalLibrary local, Track? firstSong, Action close, Action<string, string, bool> created,
+    PlaylistDialogMode mode = PlaylistDialogMode.Create, IReadOnlyList<Track>? songs = null, string initialTitle = "", string initialDescription = "")
     : DialogViewModel(close)
 {
     public Track? FirstSong { get; } = firstSong;
 
-    /// <summary>Signed out, playlists can only be local, so the choice isn't shown.</summary>
-    public bool CanChooseDestination { get; } = api.IsLoggedIn;
+    /// <summary>The songs the playlist starts with when importing / uploading.</summary>
+    public IReadOnlyList<Track> Songs { get; } = songs ?? (firstSong is null ? [] : [firstSong]);
+
+    public string Heading { get; } = mode switch
+    {
+        PlaylistDialogMode.Import => "Import playlist",
+        PlaylistDialogMode.Upload => "Upload to YouTube Music",
+        _ => "New playlist",
+    };
+
+    public string ConfirmText { get; } = mode switch
+    {
+        PlaylistDialogMode.Import => "Import",
+        PlaylistDialogMode.Upload => "Upload",
+        _ => "Create",
+    };
+
+    /// <summary>"42 songs" under the heading when importing / uploading.</summary>
+    public string? SongsText { get; } = mode == PlaylistDialogMode.Create ? null
+        : (songs?.Count ?? 0) == 1 ? "1 song" : $"{songs?.Count ?? 0} songs";
+
+    /// <summary>Signed out, playlists can only be local, so the choice isn't shown; an upload always goes to YouTube.</summary>
+    public bool CanChooseDestination { get; } = api.IsLoggedIn && mode != PlaylistDialogMode.Upload;
+
+    /// <summary>The "sign in to create on YouTube Music too" hint (not when uploading).</summary>
+    public bool ShowSignInHint { get; } = !api.IsLoggedIn;
 
     [ObservableProperty] private bool _isLocal = !api.IsLoggedIn;
 
@@ -111,9 +140,9 @@ public sealed partial class CreatePlaylistDialog(
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
-    private string _title = "";
+    private string _title = initialTitle;
 
-    [ObservableProperty] private string _description = "";
+    [ObservableProperty] private string _description = initialDescription;
     [ObservableProperty] private PlaylistPrivacy _privacy = PlaylistPrivacy.Private;
 
     private bool CanCreate => !string.IsNullOrWhiteSpace(Title);
@@ -128,13 +157,13 @@ public sealed partial class CreatePlaylistDialog(
         var title = Title.Trim();
         if (IsLocal)
         {
-            id = local.Create(title, Description.Trim(), FirstSong).Id;
+            id = local.Create(local.UniqueTitle(title), Description.Trim(), Songs).Id;
             Close();
             created(id, title, true);
             return;
         }
         if (await TryAsync(async () => id = await api.CreatePlaylistAsync(
-                title, Description.Trim(), Privacy, FirstSong is null ? null : [FirstSong.VideoId])))
+                title, Description.Trim(), Privacy, Songs.Select(t => t.VideoId))))
         {
             Close();
             created(id, title, false);

@@ -66,6 +66,22 @@
                                     ToolTip="Delete playlist" CommandParameter="{Binding}"
                                     Command="{Binding DataContext.DeletePlaylistCommand, RelativeSource={RelativeSource AncestorType=v:ShellView}}"
                                     Visibility="{Binding CanDelete, Converter={StaticResource BoolVis}}"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE712;" FontSize="22" Width="48" Height="48" Margin="4,0,0,0"
+                                    ToolTip="More options" v:ListBehaviors.OpenMenuOnClick="True"
+                                    Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=v:ShellView}}">
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Copy to this PC" Tag="&#xE977;" CommandParameter="{Binding}"
+                                                  Command="{Binding PlacementTarget.Tag.CopyToLocalCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Visibility="{Binding IsLocal, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                                        <MenuItem Header="Upload to YouTube Music" Tag="&#xE898;" CommandParameter="{Binding}"
+                                                  Command="{Binding PlacementTarget.Tag.UploadToYouTubeCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  Visibility="{Binding CanUpload, Converter={StaticResource BoolVis}}"/>
+                                        <MenuItem Header="Export to file…" Tag="&#xE78C;" CommandParameter="{Binding}"
+                                                  Command="{Binding PlacementTarget.Tag.ExportPlaylistCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
                         </StackPanel>
 
                         <TextBlock Text="{Binding Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Margin="8,0,8,8"

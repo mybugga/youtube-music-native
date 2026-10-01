@@ -53,6 +53,8 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 - Right-click any song (rows, cards, the queue, the player) to play next, add to queue or a playlist, start a radio,
   copy the link, or open it in the big player
 - Queue with autoplay radio, shuffle, and repeat off / all / one
+- **Move playlists around**: copy a YouTube Music playlist or album to this PC, upload a local playlist to your
+  YouTube Music account, or export any playlist to a `.json` file and import it again (on this PC or to YouTube)
 - **Mini player**: compact, always on top, with play / pause on the cover plus shuffle and repeat. It has a drawer
   for Up next, Search and Library that hides itself when you move away. Drag it to a screen edge and it tucks
   away to a small cover tab.

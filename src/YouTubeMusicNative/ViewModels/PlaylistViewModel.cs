@@ -28,6 +28,9 @@ public sealed partial class PlaylistViewModel : TrackListViewModel
     public bool IsLikedSongs => Info.PlaylistId == "LM";
     public bool IsLocal => LocalLibrary.IsLocalId(Info.BrowseId);
 
+    /// <summary>"Upload to YouTube Music" in the more menu: a local playlist, while signed in.</summary>
+    public bool CanUpload => IsLocal && _api.IsLoggedIn;
+
     /// <summary>Owner line in the header; local playlists' library subtitle is just the song count, already shown.</summary>
     public string HeaderSubtitle => IsLocal ? "On this PC" : Info.Subtitle;
 

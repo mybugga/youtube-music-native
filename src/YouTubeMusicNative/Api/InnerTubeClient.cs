@@ -155,18 +155,43 @@ public sealed class InnerTubeClient : IDisposable
         return AccountParser.ParseAddToPlaylist(await PostAsync("playlist/get_add_to_playlist", body, null, ct));
     }
 
-    /// <summary>Creates a playlist (optionally with songs) and returns its id.</summary>
+    /// <summary>Songs per create / edit request when copying a whole playlist.</summary>
+    private const int SongsPerRequest = 50;
+
+    /// <summary>Creates a playlist (optionally with songs, any number of them) and returns its id.</summary>
     public async Task<string> CreatePlaylistAsync(string title, string description, PlaylistPrivacy privacy,
         IEnumerable<string>? videoIds = null, CancellationToken ct = default)
     {
+        var ids = videoIds?.Distinct().ToList() ?? [];
         var body = NewBody();
         body["title"] = title;
         body["description"] = description;
         body["privacyStatus"] = privacy.ToString().ToUpperInvariant();
-        if (videoIds?.ToList() is { Count: > 0 } ids)
-            body["videoIds"] = new JsonArray(ids.Select(id => (JsonNode)id).ToArray());
+        if (ids.Count > 0)
+            body["videoIds"] = new JsonArray(ids.Take(SongsPerRequest).Select(id => (JsonNode)id).ToArray());
         var json = await PostAsync("playlist/create", body, null, ct);
-        return json.Str("playlistId") ?? throw new HttpRequestException("YouTube Music didn't return the new playlist.");
+        var playlistId = json.Str("playlistId") ?? throw new HttpRequestException("YouTube Music didn't return the new playlist.");
+        if (ids.Count > SongsPerRequest) await AddToPlaylistBulkAsync(playlistId, ids.Skip(SongsPerRequest), ct);
+        return playlistId;
+    }
+
+    /// <summary>Adds many songs, a batch per request; songs already in the playlist are skipped.</summary>
+    public async Task AddToPlaylistBulkAsync(string playlistId, IEnumerable<string> videoIds, CancellationToken ct = default)
+    {
+        foreach (var chunk in videoIds.Chunk(SongsPerRequest))
+        {
+            var body = NewBody();
+            body["playlistId"] = playlistId;
+            body["actions"] = new JsonArray(chunk.Select(id => (JsonNode)new JsonObject
+            {
+                ["action"] = "ACTION_ADD_VIDEO",
+                ["addedVideoId"] = id,
+                ["dedupeOption"] = "DEDUPE_OPTION_SKIP",
+            }).ToArray());
+            var json = await PostAsync("browse/edit_playlist", body, null, ct);
+            if (json.Str("status") is { } status && status != "STATUS_SUCCEEDED")
+                throw new HttpRequestException($"YouTube Music couldn't add the songs ({status}).");
+        }
     }
 
     public async Task DeletePlaylistAsync(string playlistId, CancellationToken ct = default)
@@ -228,17 +253,21 @@ public sealed class InnerTubeClient : IDisposable
     }
 
     /// <summary>Video ids of every liked song (follows continuations, up to <paramref name="maxPages"/>).</summary>
-    public async Task<HashSet<string>> GetLikedVideoIdsAsync(int maxPages = 40, CancellationToken ct = default)
+    public async Task<HashSet<string>> GetLikedVideoIdsAsync(int maxPages = 40, CancellationToken ct = default) =>
+        (await GetAllPlaylistTracksAsync("VLLM", maxPages, ct)).Select(t => t.VideoId).ToHashSet();
+
+    /// <summary>Every song of a playlist or album (follows continuations, up to <paramref name="maxPages"/>).</summary>
+    public async Task<List<Track>> GetAllPlaylistTracksAsync(string browseId, int maxPages = 100, CancellationToken ct = default)
     {
-        var ids = new HashSet<string>();
-        var page = await GetPlaylistAsync("VLLM", ct);
+        var tracks = new List<Track>();
+        var page = await GetPlaylistAsync(browseId, ct);
         for (int i = 0; ; i++)
         {
-            foreach (var t in page.Tracks) ids.Add(t.VideoId);
+            tracks.AddRange(page.Tracks);
             if (page.Next is not { } next || i + 1 >= maxPages) break;
             page = await ContinuePlaylistAsync(next, ct);
         }
-        return ids;
+        return tracks;
     }
 
     public async Task<TrackPage> GetPlaylistAsync(string browseId, CancellationToken ct = default)

@@ -1429,8 +1429,10 @@
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="12"
                             ToolTip="Close" Command="{Binding CloseCommand}"/>
-                    <TextBlock Text="New playlist" Style="{StaticResource DialogTitle}"/>
+                    <TextBlock Text="{Binding Heading}" Style="{StaticResource DialogTitle}"/>
                 </DockPanel>
+                <TextBlock Text="{Binding SongsText}" Style="{StaticResource Sub}" Margin="0,4,0,0"
+                           Visibility="{Binding SongsText, Converter={StaticResource Vis}}"/>
                 <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,0" Visibility="{Binding FirstSong, Converter={StaticResource Vis}}">
                     <Run Text="Starting with"/>
                     <Run Text="{Binding FirstSong.Title, Mode=OneWay}" FontWeight="SemiBold" Foreground="White"/>
@@ -1456,7 +1458,7 @@
                 </StackPanel>
                 <TextBlock Style="{StaticResource Sub}" Margin="0,8,0,0" TextWrapping="Wrap" TextTrimming="None"
                            Text="Saved on this PC. Sign in to create playlists on YouTube Music too."
-                           Visibility="{Binding CanChooseDestination, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                           Visibility="{Binding ShowSignInHint, Converter={StaticResource BoolVis}}"/>
 
                 <TextBlock Text="Title" Style="{StaticResource Label}" Margin="0,18,0,6"/>
                 <Grid>
@@ -1508,7 +1510,7 @@
                     <v:Spinner Width="18" Height="18" Thickness="2" Margin="0,0,14,0"
                                Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"/>
                     <Button Style="{StaticResource OutlinePill}" Content="Cancel" Command="{Binding CloseCommand}" Margin="0,0,8,0"/>
-                    <Button Style="{StaticResource PillButton}" Content="Create" Padding="22,8" Command="{Binding CreateCommand}"/>
+                    <Button Style="{StaticResource PillButton}" Content="{Binding ConfirmText}" Padding="22,8" Command="{Binding CreateCommand}"/>
                 </StackPanel>
             </StackPanel>
         </DataTemplate>
