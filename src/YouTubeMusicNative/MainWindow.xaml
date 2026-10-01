@@ -1,0 +1,23 @@
+<Window x:Class="YouTubeMusicNative.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="YouTube Music Native"
+        Icon="pack://application:,,,/Assets/app.ico"
+        MinWidth="820" MinHeight="560"
+        Background="{StaticResource Bg}"
+        Foreground="{StaticResource Text}"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        FontFamily="{StaticResource Body}"
+        FontSize="13">
+    <!-- Custom title bar: the top 64px (minus interactive controls) drags the window -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="56" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static SystemCommands.MinimizeWindowCommand}" Executed="OnMinimize"/>
+        <CommandBinding Command="{x:Static SystemCommands.MaximizeWindowCommand}" Executed="OnMaximize"/>
+        <CommandBinding Command="{x:Static SystemCommands.RestoreWindowCommand}" Executed="OnRestore"/>
+        <CommandBinding Command="{x:Static SystemCommands.CloseWindowCommand}" Executed="OnClose"/>
+    </Window.CommandBindings>
+</Window>

@@ -1,0 +1,83 @@
+<UserControl x:Class="YouTubeMusicNative.Views.NowPlayingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="clr-namespace:YouTubeMusicNative.Views"
+             Style="{StaticResource PageRoot}">
+    <!-- DataContext: QueueViewModel -->
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0.6,1">
+                <GradientStop Color="{Binding Playback.ArtColor}" Offset="0"/>
+                <GradientStop Color="#121212" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <Button Style="{StaticResource CircleButton}" Content="&#xE70D;" FontSize="14" Width="40" Height="40"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Panel.ZIndex="1"
+                ToolTip="Close now playing (Esc)"
+                Command="{Binding DataContext.ToggleNowPlayingCommand, RelativeSource={RelativeSource AncestorType=v:ShellView}}"/>
+
+        <Grid Margin="40,32,24,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Art + titles -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Viewbox Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520">
+                    <Border Width="480" Height="480" CornerRadius="10" Background="{StaticResource Elevated}">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="60" ShadowDepth="8" Opacity="0.55" RenderingBias="Performance"/>
+                        </Border.Effect>
+                        <Grid>
+                            <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="96" Foreground="{StaticResource TextFaint}"/>
+                            <Border CornerRadius="10">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=480}"
+                                                Stretch="UniformToFill"/>
+                                </Border.Background>
+                            </Border>
+                            <Border CornerRadius="10" Background="#80000000"
+                                    Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
+                                <v:Spinner Width="72" Height="72" Thickness="5"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Viewbox>
+                <StackPanel Grid.Row="1" Margin="0,28,0,0" HorizontalAlignment="Center" MaxWidth="520">
+                    <TextBlock Text="{Binding Playback.NowPlaying.Title, TargetNullValue='Nothing playing', FallbackValue='Nothing playing'}"
+                               Style="{StaticResource H1}" TextAlignment="Center" TextWrapping="Wrap" MaxHeight="84"/>
+                    <TextBlock Text="{Binding Playback.NowPlaying.Artists}" Style="{StaticResource Sub}" FontSize="16"
+                               Foreground="#D9FFFFFF" TextAlignment="Center" Margin="0,6,0,0"/>
+                    <TextBlock Text="{Binding Playback.NowPlaying.Album}" Style="{StaticResource Sub}" TextAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Up next (hidden while the queue side panel shows the same list) -->
+            <Border Grid.Column="1" Width="380" Margin="32,0,0,0" Background="#33000000" CornerRadius="10" Padding="8,16,4,8"
+                    Visibility="{Binding DataContext.IsQueueOpen, RelativeSource={RelativeSource AncestorType=v:ShellView}, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Up next" FontSize="16" FontWeight="Bold" Margin="12,0,0,10"/>
+                    <ListBox Grid.Row="1" Style="{StaticResource TrackList}"
+                             ItemsSource="{Binding Queue.Items}" ItemTemplate="{StaticResource QueueRow}"
+                             ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                             v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"/>
+                    <DockPanel Grid.Row="2" Margin="12,12,12,4">
+                        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding Playback.Autoplay}"/>
+                        <TextBlock Text="Autoplay similar songs" Style="{StaticResource Sub}" VerticalAlignment="Center"/>
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

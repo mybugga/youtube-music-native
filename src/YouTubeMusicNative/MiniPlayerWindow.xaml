@@ -1,0 +1,400 @@
+<Window x:Class="YouTubeMusicNative.MiniPlayerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:YouTubeMusicNative.Views"
+        Title="YouTube Music Native mini player"
+        Icon="pack://application:,,,/Assets/app.ico"
+        Width="440" Height="136" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
+        WindowStyle="None"
+        Background="#121212"
+        Foreground="{StaticResource Text}"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        FontFamily="{StaticResource Body}"
+        FontSize="13">
+    <!-- DataContext: MainViewModel. Drag anywhere to move; drag to the left/right screen edge to tuck it away. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="0" CornerRadius="0"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Window buttons fade in while the pointer is over the player -->
+        <Style x:Key="HoverReveal" TargetType="FrameworkElement">
+            <Setter Property="Opacity" Value="0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                    <Setter Property="Opacity" Value="1"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Drawer tab: dim text, white pill when selected (Tag = tab name) -->
+        <Style x:Key="MiniTabPill" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+            <Setter Property="Background" Value="#1FFFFFFF"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="14" Padding="14,5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource EqualsMulti}">
+                            <Binding Path="Tag" RelativeSource="{RelativeSource Self}"/>
+                            <Binding Path="TabName"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="White"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid ClipToBounds="True">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="136"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- Backdrop: the cover, blurred and darkened. Cached so the blur is rendered once, not every frame. -->
+        <Rectangle Margin="-60" CacheMode="BitmapCache" Opacity="0.75">
+            <Rectangle.Fill>
+                <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=120}" Stretch="UniformToFill"/>
+            </Rectangle.Fill>
+            <Rectangle.Effect>
+                <BlurEffect Radius="48" RenderingBias="Performance" KernelType="Gaussian"/>
+            </Rectangle.Effect>
+        </Rectangle>
+        <Rectangle>
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#59000000" Offset="0"/>
+                    <GradientStop Color="#CC0D0D0D" Offset="0.55"/>
+                    <GradientStop Color="#E60D0D0D" Offset="1"/>
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <Grid Margin="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Cover (double-click: full player) -->
+            <Grid Width="108" Height="108" VerticalAlignment="Center" MouseLeftButtonDown="OnArtMouseDown">
+                <Border CornerRadius="8" Background="{StaticResource Elevated}">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.6" RenderingBias="Performance"/>
+                    </Border.Effect>
+                    <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="30" Foreground="{StaticResource TextFaint}"/>
+                </Border>
+                <Border CornerRadius="8">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=108}" Stretch="UniformToFill"/>
+                    </Border.Background>
+                </Border>
+                <Border CornerRadius="8" Background="#99000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
+                    <v:Spinner Width="34" Height="34" Thickness="3"/>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Column="1" Margin="16,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Title / artist + window buttons -->
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="6,-4,-6,0"
+                                Style="{StaticResource HoverReveal}">
+                        <Button Style="{StaticResource IconButton}" Content="&#xE740;" FontSize="12" Width="26" Height="26"
+                                ToolTip="Open full player" Click="OnExpandClick"/>
+                        <Button Style="{StaticResource IconButton}" Content="&#xE8BB;" FontSize="10" Width="26" Height="26"
+                                ToolTip="Close (keeps playing in the tray)" Click="OnCloseClick"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="{Binding Playback.NowPlaying.Title, TargetNullValue='Nothing playing', FallbackValue='Nothing playing'}"
+                                   Style="{StaticResource Title}" FontSize="15" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Playback.NowPlaying.Artists}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"
+                                   Foreground="#BFFFFFFF"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Controls -->
+                <Grid Grid.Row="1" VerticalAlignment="Center" Margin="-6,2,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource IconButton}" Content="&#xE892;" FontSize="16" Foreground="#E6FFFFFF" ToolTip="Previous"
+                                Command="{Binding PreviousCommand}"/>
+                        <Button Style="{StaticResource PlayButton}" Width="38" Height="38" FontSize="15" Margin="6,0"
+                                Command="{Binding PlayPauseCommand}"
+                                Content="{Binding Playback.IsPaused, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE768;|&#xE769;}"/>
+                        <Button Style="{StaticResource IconButton}" Content="&#xE893;" FontSize="16" Foreground="#E6FFFFFF" ToolTip="Next"
+                                Command="{Binding NextCommand}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button Style="{StaticResource IconButton}" FontSize="15"
+                            Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}"
+                            Visibility="{Binding Actions.IsLoggedIn, Converter={StaticResource BoolVis}}">
+                        <Button.Content>
+                            <MultiBinding Converter="{StaticResource Liked}" ConverterParameter="&#xE00B;|&#xE006;">
+                                <Binding Path="Playback.NowPlaying.VideoId"/>
+                                <Binding Path="Actions.LikesVersion"/>
+                            </MultiBinding>
+                        </Button.Content>
+                        <Button.Foreground>
+                            <MultiBinding Converter="{StaticResource Liked}" ConverterParameter="#FF3355|#E6FFFFFF">
+                                <Binding Path="Playback.NowPlaying.VideoId"/>
+                                <Binding Path="Actions.LikesVersion"/>
+                            </MultiBinding>
+                        </Button.Foreground>
+                        <Button.ToolTip>
+                            <MultiBinding Converter="{StaticResource Liked}" ConverterParameter="Remove from Liked Music|Save to Liked Music">
+                                <Binding Path="Playback.NowPlaying.VideoId"/>
+                                <Binding Path="Actions.LikesVersion"/>
+                            </MultiBinding>
+                        </Button.ToolTip>
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" FontSize="13" Margin="2,0,-6,0" ToolTip="Up next, search and library"
+                            Command="{Binding DataContext.ToggleExpandedCommand, ElementName=Drawer}"
+                            Content="{Binding DataContext.IsExpanded, ElementName=Drawer, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE70E;|&#xE70D;}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Seek -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="PositionText" Text="0:00" Style="{StaticResource Sub}" FontSize="10" VerticalAlignment="Center"
+                               Foreground="#B3FFFFFF" Margin="0,0,8,0"/>
+                    <Slider x:Name="SeekSlider" Grid.Column="1" Style="{StaticResource ThinSlider}" Minimum="0" Maximum="1"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Playback.Duration, Converter={StaticResource Time}}" Style="{StaticResource Sub}"
+                               FontSize="10" VerticalAlignment="Center" Foreground="#B3FFFFFF" Margin="8,0,0,0"/>
+                </Grid>
+            </Grid>
+        </Grid>
+
+
+        <!-- ================================================= Drawer: up next / search / library -->
+        <Grid x:Name="Drawer" Grid.Row="1" Height="380" VerticalAlignment="Top" Background="#121212" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Height="1" VerticalAlignment="Top" Background="{StaticResource Divider}"/>
+
+            <!-- Tabs -->
+            <StackPanel Orientation="Horizontal" Margin="12,12,12,8">
+                <Button Style="{StaticResource MiniTabPill}" Content="Up next" Tag="Queue"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Queue"/>
+                <Button Style="{StaticResource MiniTabPill}" Content="Search" Tag="Search"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Search"/>
+                <Button Style="{StaticResource MiniTabPill}" Content="Library" Tag="Library"
+                        Command="{Binding SelectTabCommand}" CommandParameter="Library"/>
+            </StackPanel>
+
+            <!-- Up next -->
+            <Grid Grid.Row="1" DataContext="{Binding Main.Queue}"
+                  Visibility="{Binding DataContext.IsQueueTab, ElementName=Drawer, Converter={StaticResource BoolVis}}">
+                <ListBox Style="{StaticResource TrackList}" Margin="4,0,4,4"
+                         ItemsSource="{Binding Queue.Items}" ItemTemplate="{StaticResource QueueRow}"
+                         ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                         v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"/>
+                <TextBlock Style="{StaticResource Sub}" TextAlignment="Center" Margin="24,36" VerticalAlignment="Top"
+                           Text="Your queue is empty."
+                           Visibility="{Binding Queue.Items.Count, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+            </Grid>
+
+            <!-- Search -->
+            <Grid Grid.Row="1" Visibility="{Binding IsSearchTab, Converter={StaticResource BoolVis}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid Height="40" Margin="12,0,12,8">
+                    <TextBox x:Name="SearchInput" Style="{StaticResource SearchBox}"
+                             Text="{Binding Main.SearchText, UpdateSourceTrigger=PropertyChanged}">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding Main.SubmitSearchCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="11" HorizontalAlignment="Right" Margin="0,0,6,0"
+                            ToolTip="Clear" Click="OnClearSearch"
+                            Visibility="{Binding Main.SearchText, Converter={StaticResource Vis}}"/>
+                </Grid>
+                <Grid Grid.Row="1" DataContext="{Binding Main.Search}">
+                    <ListBox Style="{StaticResource TrackList}" Margin="4,0,4,4"
+                             ItemsSource="{Binding Tracks}" ItemTemplate="{StaticResource CompactTrackRow}"
+                             ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                             v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"
+                             v:ListBehaviors.EndReachedCommand="{Binding LoadMoreCommand}"
+                             Visibility="{Binding ShowResults, Converter={StaticResource BoolVis}}"/>
+                    <!-- Recent searches -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding ShowRecent, Converter={StaticResource BoolVis}}">
+                        <StackPanel Margin="8,0,8,8">
+                            <DockPanel Margin="8,4,4,6">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Width="Auto" Height="Auto" Padding="6,2"
+                                        FontFamily="{StaticResource Body}" FontSize="12" Content="Clear all" Command="{Binding ClearRecentCommand}"/>
+                                <TextBlock Text="Recent searches" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding RecentSearches}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource RowButton}" Padding="8,6" CommandParameter="{Binding}"
+                                                Command="{Binding DataContext.UseRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="10"
+                                                        Width="26" Height="26" Foreground="{StaticResource TextFaint}" ToolTip="Remove"
+                                                        CommandParameter="{Binding}"
+                                                        Command="{Binding DataContext.RemoveRecentCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
+                                                <TextBlock Text="&#xE81C;" Style="{StaticResource Glyph}" FontSize="13" Foreground="{StaticResource TextDim}"/>
+                                                <TextBlock Text="{Binding}" Margin="12,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                            </DockPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <TextBlock Style="{StaticResource Sub}" TextAlignment="Center" Margin="24,36" VerticalAlignment="Top"
+                               Text="Search for songs to play or queue."
+                               Visibility="{Binding ShowIntro, Converter={StaticResource BoolVis}}"/>
+                    <Border VerticalAlignment="Top" Height="2" Background="{StaticResource Accent}"
+                            Visibility="{Binding IsLoading, Converter={StaticResource BoolVis}}"/>
+                </Grid>
+            </Grid>
+
+            <!-- Library -->
+            <Grid Grid.Row="1" Visibility="{Binding IsLibraryTab, Converter={StaticResource BoolVis}}">
+                <!-- Playlist list -->
+                <Grid Visibility="{Binding OpenPlaylist, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                    <ListBox Style="{StaticResource TrackList}" Margin="4,0,4,4" ItemsSource="{Binding Main.Library.Playlists}"
+                             ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                             v:ListBehaviors.ActivateCommand="{Binding ShowPlaylistCommand}"
+                             Visibility="{Binding Main.Library.IsLoggedIn, Converter={StaticResource BoolVis}}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource RowButton}" Padding="8,6" CommandParameter="{Binding}"
+                                        Command="{Binding DataContext.ShowPlaylistCommand, ElementName=Drawer}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="Tile" Width="40" Height="40" CornerRadius="4" Background="{StaticResource ElevatedHover}">
+                                            <TextBlock x:Name="TileGlyph" Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="15" Foreground="{StaticResource TextFaint}"/>
+                                        </Border>
+                                        <Border Width="40" Height="40" CornerRadius="4">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=40}" Stretch="UniformToFill"/>
+                                            </Border.Background>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource Title}" FontWeight="Normal" FontSize="14"/>
+                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" FontSize="12" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding PlaylistId}" Value="LM">
+                                        <Setter TargetName="Tile" Property="Background" Value="#7A45E6"/>
+                                        <Setter TargetName="TileGlyph" Property="Text" Value="&#xEB52;"/>
+                                        <Setter TargetName="TileGlyph" Property="Foreground" Value="White"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Style="{StaticResource Sub}" TextAlignment="Center" TextWrapping="Wrap" TextTrimming="None" Margin="32,36"
+                               VerticalAlignment="Top" Text="Sign in from the full player to see your playlists here."
+                               Visibility="{Binding Main.Library.IsLoggedIn, Converter={StaticResource Vis}, ConverterParameter=invert, FallbackValue=Collapsed}"/>
+                </Grid>
+
+                <!-- One playlist -->
+                <Grid DataContext="{Binding OpenPlaylist}" Visibility="{Binding Converter={StaticResource Vis}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="8,0,12,6">
+                        <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Content="&#xE72B;" FontSize="13" ToolTip="Back to your library"
+                                Command="{Binding DataContext.ClosePlaylistCommand, ElementName=Drawer}"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource PlayButton}" Width="32" Height="32" FontSize="12"
+                                Content="&#xE768;" ToolTip="Play all" Command="{Binding PlayAllCommand}"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE8B1;" FontSize="14" Margin="0,0,6,0"
+                                ToolTip="Shuffle play" Command="{Binding ShuffleAllCommand}"/>
+                        <StackPanel Margin="6,0,8,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Info.Title}" Style="{StaticResource Title}" FontSize="14"/>
+                            <TextBlock Text="{Binding TrackCountText}" Style="{StaticResource Sub}" FontSize="11"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <ListBox Grid.Row="1" Style="{StaticResource TrackList}" Margin="4,0,4,4"
+                             ItemsSource="{Binding Tracks}" ItemTemplate="{StaticResource CompactTrackRow}"
+                             ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                             v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"
+                             v:ListBehaviors.EndReachedCommand="{Binding LoadMoreCommand}"/>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,30"
+                                Visibility="{Binding IsLoading, Converter={StaticResource BoolVis}}">
+                        <v:Spinner Width="18" Height="18" Thickness="2"/>
+                        <TextBlock Text="Loading…" Style="{StaticResource Sub}" Margin="10,0,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- Handle shown while tucked against a screen edge: the window shrinks to this square and only it is on
+             screen. Just the cover, with a thin progress line; dimmed with a play mark while paused. Hover to slide out. -->
+        <Grid x:Name="Tab" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Top" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
+              Background="{StaticResource Elevated}" ToolTip="{Binding Playback.NowPlaying.Title}">
+            <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="16" Foreground="{StaticResource TextFaint}"/>
+            <Rectangle>
+                <Rectangle.Fill>
+                    <ImageBrush ImageSource="{Binding Playback.NowPlaying.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=52}" Stretch="UniformToFill"/>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Border Background="#8C000000" Visibility="{Binding Playback.IsPaused, Converter={StaticResource BoolVis}}">
+                <TextBlock Text="&#xE768;" Style="{StaticResource Glyph}" FontSize="14" Foreground="White"/>
+            </Border>
+            <Border Background="#8C000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
+                <v:Spinner Width="20" Height="20" Thickness="2"/>
+            </Border>
+            <!-- progress -->
+            <Rectangle Height="3" VerticalAlignment="Bottom" Fill="#59000000"/>
+            <Rectangle Height="3" VerticalAlignment="Bottom" Fill="{StaticResource Accent}" RenderTransformOrigin="0,0.5">
+                <Rectangle.RenderTransform>
+                    <ScaleTransform>
+                        <ScaleTransform.ScaleX>
+                            <MultiBinding Converter="{StaticResource Fraction}">
+                                <Binding Path="Playback.Position"/>
+                                <Binding Path="Playback.Duration"/>
+                            </MultiBinding>
+                        </ScaleTransform.ScaleX>
+                    </ScaleTransform>
+                </Rectangle.RenderTransform>
+            </Rectangle>
+        </Grid>
+    </Grid>
+</Window>

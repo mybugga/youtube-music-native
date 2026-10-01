@@ -1,0 +1,44 @@
+<UserControl x:Class="YouTubeMusicNative.Views.QueuePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:v="clr-namespace:YouTubeMusicNative.Views">
+    <!-- DataContext: QueueViewModel -->
+    <Border Background="{StaticResource Panel}" CornerRadius="8">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Margin="20,16,12,12">
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="12" ToolTip="Close"
+                        Command="{Binding DataContext.ToggleQueueCommand, RelativeSource={RelativeSource AncestorType=v:ShellView}}"/>
+                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE74D;" FontSize="14" ToolTip="Clear upcoming"
+                        Command="{Binding ClearUpcomingCommand}" Margin="0,0,4,0"/>
+                <TextBlock Text="Queue" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+            </DockPanel>
+
+            <ListBox Grid.Row="1" Style="{StaticResource TrackList}" Margin="8,0,4,0"
+                     ItemsSource="{Binding Queue.Items}" ItemTemplate="{StaticResource QueueRow}"
+                     ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
+                     v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"/>
+
+            <TextBlock Grid.Row="1" Style="{StaticResource Sub}" TextWrapping="Wrap" TextAlignment="Center" Margin="24,40"
+                       VerticalAlignment="Top" TextTrimming="None"
+                       Text="Your queue is empty. Play something and it'll show up here."
+                       Visibility="{Binding Queue.Items.Count, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+
+            <Border Grid.Row="2" BorderBrush="{StaticResource Divider}" BorderThickness="0,1,0,0" Padding="20,14">
+                <DockPanel>
+                    <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                  IsChecked="{Binding Playback.Autoplay}"/>
+                    <StackPanel>
+                        <TextBlock Text="Autoplay" FontWeight="SemiBold"/>
+                        <TextBlock Text="Keep playing similar songs" Style="{StaticResource Sub}" FontSize="12" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
