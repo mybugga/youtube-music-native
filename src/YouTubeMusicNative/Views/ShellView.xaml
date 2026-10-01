@@ -31,8 +31,8 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                <Image Source="pack://application:,,,/Assets/logo.png" Width="28" Height="28"
-                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                <!-- The logo, live: its bars bounce like an equalizer while music plays -->
+                <v:LiveLogo Width="28" Height="28" Playback="{Binding Playback}"/>
                 <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
                 <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Margin="16,0,0,0" ToolTip="Go back"
                         Command="{Binding GoBackCommand}" WindowChrome.IsHitTestVisibleInChrome="True"/>
@@ -87,32 +87,45 @@
                         </StackPanel>
                     </Button>
                 </Grid>
-                <Grid VerticalAlignment="Center" Margin="0,14,12,0">
-                <Button WindowChrome.IsHitTestVisibleInChrome="True"
-                        ToolTip="{Binding Login.Account.Name, TargetNullValue=Account, FallbackValue=Account}"
+                <!-- Account & settings: a gear (the gear turns a little on hover). -->
+                <Button WindowChrome.IsHitTestVisibleInChrome="True" VerticalAlignment="Center" Margin="0,14,12,0"
+                        ToolTip="Account &amp; settings" AutomationProperties.Name="Account and settings"
                         Command="{Binding NavigateCommand}" CommandParameter="{x:Static vm:AppPage.Account}">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource CircleButton}">
                             <Setter Property="Width" Value="36"/>
                             <Setter Property="Height" Value="36"/>
-                            <Setter Property="Content" Value="&#xE77B;"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsLoggedIn}" Value="True">
-                                    <Setter Property="Background" Value="{StaticResource Accent}"/>
-                                    <Setter Property="Foreground" Value="Black"/>
-                                </DataTrigger>
-                            </Style.Triggers>
                         </Style>
                     </Button.Style>
+                    <TextBlock x:Name="Gear" Text="&#xE713;" FontFamily="{StaticResource Icons}" FontSize="16"
+                               RenderTransformOrigin="0.5,0.5">
+                        <TextBlock.RenderTransform>
+                            <RotateTransform/>
+                        </TextBlock.RenderTransform>
+                    </TextBlock>
+                    <Button.Triggers>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Gear" Storyboard.TargetProperty="RenderTransform.Angle"
+                                                     To="60" Duration="0:0:0.35">
+                                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Gear" Storyboard.TargetProperty="RenderTransform.Angle"
+                                                     To="0" Duration="0:0:0.35">
+                                        <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Button.Triggers>
                 </Button>
-                <!-- Profile photo over the button; clicks pass through to it. -->
-                <Ellipse Width="32" Height="32" IsHitTestVisible="False"
-                         Visibility="{Binding Login.Account.PhotoUrl, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
-                    <Ellipse.Fill>
-                        <ImageBrush ImageSource="{Binding Login.Account.PhotoUrl, Converter={StaticResource Thumb}, ConverterParameter=32}" Stretch="UniformToFill"/>
-                    </Ellipse.Fill>
-                </Ellipse>
-                </Grid>
                 <Button Style="{StaticResource WindowButton}" Content="&#xE73F;" ToolTip="Mini player"
                         Command="{Binding ShowMiniPlayerCommand}" WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <Button Style="{StaticResource WindowButton}" Content="&#xE921;" ToolTip="Minimize"
