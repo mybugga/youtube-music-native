@@ -53,14 +53,16 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The shortcuts take their icon from this file, not the exe, so a new icon isn't hidden by Windows' icon cache.
+Source: "..\src\YouTubeMusicNative\Assets\app.ico"; DestDir: "{app}"; DestName: "YouTubeMusicNative.ico"; Flags: ignoreversion
 
 [InstallDelete]
 ; Leftovers from an older build layout.
 Type: files; Name: "{app}\*.pdb"
 
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppKey}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\YouTubeMusicNative.ico"; AppUserModelID: "{#AppKey}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\YouTubeMusicNative.ico"; Tasks: desktopicon
 
 [Run]
 ; Interactive install: offer to launch. Silent update with /RELAUNCH=1: start the new version straight away.
