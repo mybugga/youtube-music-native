@@ -57,9 +57,9 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
   for Up next, Search and Library that hides itself when you move away. Drag it to a screen edge and it tucks
   away to a small cover tab.
 - **Performance** setting with three choices:
-  - *Less memory* (the default) draws with the processor and saves about 40 MB.
+  - *Less memory* draws with the processor and saves about 40 MB.
   - *Standard* draws with the graphics card.
-  - *Smooth* adds eased scrolling, sliding pages and dialogs, fading highlights, a gliding progress bar and smoother
+  - *Smooth* (the default) adds eased scrolling, sliding pages and dialogs, fading highlights, a gliding progress bar and smoother
     mini player motion, at your screen's refresh rate.
 - Your library: like songs, create and delete playlists, add songs to playlists and remove them
 - **No account needed**: signed out, likes and playlists are kept on this PC (tagged *Local*). Signed in, when you
@@ -85,7 +85,7 @@ Cookies are stored encrypted (DPAPI, your Windows account only) in `%LocalAppDat
 ## Keeping it light
 
 - Audio only (`video=no`), with a small mpv demuxer cache (3 MiB ahead, 1 MiB behind)
-- Drawn with the processor by default (*Less memory*), which skips the graphics driver's ~40 MB per-process cost
+- *Performance → Less memory* draws with the processor, which skips the graphics driver's ~40 MB per-process cost
 - Thumbnails are fetched and decoded at display size, in a bounded cache
 - Virtualized lists, and a workstation non-concurrent GC
 - Minimizing, closing to the tray or switching to the mini player releases memory: the main UI tree is dropped

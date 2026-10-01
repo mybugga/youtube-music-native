@@ -45,6 +45,21 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
         };
         if (IsInstalled) _timer.Start();
         else Status = "Development build: updates are turned off.";
+
+        // First start after an update: say so (and offer the release notes) for a little while.
+        var last = ParseVersion(store.Settings.LastRunVersion);
+        if (last is not null && last < CurrentVersion)
+        {
+            JustUpdatedTo = CurrentVersionText;
+            var hide = new DispatcherTimer { Interval = TimeSpan.FromSeconds(14) };
+            hide.Tick += (_, _) => { hide.Stop(); JustUpdatedTo = null; };
+            hide.Start();
+        }
+        if (store.Settings.LastRunVersion != CurrentVersionText)
+        {
+            store.Settings.LastRunVersion = CurrentVersionText;
+            store.Save();
+        }
     }
 
     public static Version CurrentVersion { get; } = ReadVersion();
@@ -63,6 +78,40 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
     private string? _readyVersion;
 
     public bool IsUpdateReady => ReadyVersion is not null;
+
+    /// <summary>An update is downloading in the background (the title bar shows a progress ring).</summary>
+    [ObservableProperty] private bool _isDownloading;
+    [ObservableProperty] private string? _downloadingVersion;
+
+    /// <summary>Download progress 0..1.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DownloadPercent))]
+    private double _downloadProgress;
+
+    public string DownloadPercent => $"{Math.Round(DownloadProgress * 100)}%";
+
+    /// <summary>"Restart to update" was clicked: the app shows the updating screen, then hands over to the installer.</summary>
+    [ObservableProperty] private bool _isInstalling;
+
+    /// <summary>Set on the first start after an update (the version now running), for the "Updated" notice.</summary>
+    [ObservableProperty] private string? _justUpdatedTo;
+
+    [RelayCommand]
+    private void DismissUpdated() => JustUpdatedTo = null;
+
+    [RelayCommand]
+    private void OpenReleaseNotes()
+    {
+        JustUpdatedTo = null;
+        try
+        {
+            Process.Start(new ProcessStartInfo($"{ReleasesUrl}/tag/v{CurrentVersionText}") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("open release notes failed: " + ex.Message);
+        }
+    }
 
     public bool CheckForUpdates
     {
@@ -130,11 +179,17 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
             long size = asset["size"]?.GetValue<long>() ?? -1;
             if (!File.Exists(target) || new FileInfo(target).Length != size)
             {
-                var partial = target + ".part";
-                await using (var source = await _http.GetStreamAsync(url))
-                await using (var file = File.Create(partial))
-                    await source.CopyToAsync(file);
-                File.Move(partial, target, overwrite: true);
+                DownloadingVersion = latest.ToString(3);
+                DownloadProgress = 0;
+                IsDownloading = true;
+                try
+                {
+                    await DownloadAsync(url, target, size);
+                }
+                finally
+                {
+                    IsDownloading = false;
+                }
             }
 
             // Old installers are no use once a newer one is here.
@@ -158,11 +213,45 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Installs the downloaded update now and starts the new version when it's done.</summary>
-    [RelayCommand]
-    private void RestartToUpdate()
+    /// <summary>Saves the setup to disk, reporting progress (a few times a second) as it goes.</summary>
+    private async Task DownloadAsync(string url, string target, long size)
     {
+        var partial = target + ".part";
+        using (var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+            long total = response.Content.Headers.ContentLength ?? size;
+            await using var source = await response.Content.ReadAsStreamAsync();
+            await using var file = File.Create(partial);
+            var buffer = new byte[256 * 1024];
+            long done = 0, lastReport = 0;
+            int read;
+            while ((read = await source.ReadAsync(buffer)) > 0)
+            {
+                await file.WriteAsync(buffer.AsMemory(0, read));
+                done += read;
+                if (total > 0 && (Environment.TickCount64 - lastReport > 120 || done == total))
+                {
+                    lastReport = Environment.TickCount64;
+                    DownloadProgress = (double)done / total;
+                }
+            }
+        }
+        File.Move(partial, target, overwrite: true);
+    }
+
+    /// <summary>
+    /// Installs the downloaded update now and starts the new version when it's done. The "Updating" screen shows
+    /// for a moment first, so the app doesn't just vanish.
+    /// </summary>
+    [RelayCommand]
+    private async Task RestartToUpdateAsync()
+    {
+        if (IsInstalling || _installerPath is null) return;
+        IsInstalling = true;
+        await Task.Delay(1600);
         if (StartInstaller(relaunch: true)) ExitRequested?.Invoke();
+        else IsInstalling = false;
     }
 
     /// <summary>Called as the app exits: quietly installs a waiting update if that's allowed.</summary>

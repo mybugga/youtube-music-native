@@ -122,7 +122,7 @@ public static class ListBehaviors
         {
             if (FindChild<ScrollViewer>(d) is { } own)
             {
-                own.ScrollToHorizontalOffset(own.HorizontalOffset - e.Delta);
+                Motion.GlideHorizontally(own, -e.Delta * 1.5);
                 e.Handled = true;
             }
             return;
@@ -162,7 +162,7 @@ public static class ListBehaviors
         var button = (DependencyObject)sender;
         if (GetScrollTarget(button) is not { } target || FindChild<ScrollViewer>(target) is not { } sv) return;
         double step = Math.Max(200, sv.ViewportWidth * 0.8) * GetScrollDirection(button);
-        sv.ScrollToHorizontalOffset(sv.HorizontalOffset + step);
+        Motion.GlideHorizontally(sv, step);
     }
 
     // ---- helpers ------------------------------------------------------------------------------

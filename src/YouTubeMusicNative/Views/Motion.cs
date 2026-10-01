@@ -145,6 +145,110 @@ public static class Motion
     /// <summary>Stretches a duration a little with smooth animations on (gentler motion, more frames).</summary>
     public static double Duration(double ms) => Enabled ? ms * 1.45 : ms;
 
+    // ---- always-on accents (update flow) -----------------------------------------------------
+    // These run whatever the Performance setting: they're rare, short, and tell the user something is happening.
+
+    /// <summary>Each time the element becomes visible it fades in, gliding from this offset (e.g. "16,0" or "0,-24").</summary>
+    public static readonly DependencyProperty EnterFromProperty = DependencyProperty.RegisterAttached(
+        "EnterFrom", typeof(Vector), typeof(Motion), new PropertyMetadata(default(Vector), OnEnterFromChanged));
+
+    public static Vector GetEnterFrom(DependencyObject d) => (Vector)d.GetValue(EnterFromProperty);
+    public static void SetEnterFrom(DependencyObject d, Vector value) => d.SetValue(EnterFromProperty, value);
+
+    private static void OnEnterFromChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement element || e.OldValue is Vector { Length: > 0 }) return;
+        var shift = new TranslateTransform();
+        element.RenderTransform = shift;
+        element.IsVisibleChanged += (_, args) =>
+        {
+            if (args.NewValue is not true) return;
+            var from = GetEnterFrom(element);
+            var spring = Freeze(new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut });
+            element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = Ease });
+            shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(from.X, 0, TimeSpan.FromMilliseconds(420)) { EasingFunction = spring });
+            shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(from.Y, 0, TimeSpan.FromMilliseconds(420)) { EasingFunction = spring });
+        };
+    }
+
+    /// <summary>
+    /// A soft ring that swells and fades behind a button a few times after it appears (the Update pill).
+    /// Set on the ring element; it is hidden again when the pulses are done.
+    /// </summary>
+    public static readonly DependencyProperty PulseProperty = DependencyProperty.RegisterAttached(
+        "Pulse", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnPulseChanged));
+
+    public static bool GetPulse(DependencyObject d) => (bool)d.GetValue(PulseProperty);
+    public static void SetPulse(DependencyObject d, bool value) => d.SetValue(PulseProperty, value);
+
+    private static void OnPulseChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement ring || e.NewValue is not true) return;
+        var scale = new ScaleTransform(1, 1);
+        ring.RenderTransform = scale;
+        ring.RenderTransformOrigin = new Point(0.5, 0.5);
+        ring.Opacity = 0;
+        ring.IsVisibleChanged += (_, args) =>
+        {
+            if (args.NewValue is not true)
+            {
+                ring.BeginAnimation(UIElement.OpacityProperty, null);
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                return;
+            }
+            var repeat = new RepeatBehavior(4);
+            var begin = TimeSpan.FromMilliseconds(500);
+            ring.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimationUsingKeyFrames
+            {
+                BeginTime = begin, RepeatBehavior = repeat, FillBehavior = FillBehavior.Stop,
+                KeyFrames = { new LinearDoubleKeyFrame(0.7, KeyTime.FromTimeSpan(TimeSpan.Zero)),
+                              new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1100)), Ease),
+                              new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1700))) },
+            });
+            foreach (var axis in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty })
+                scale.BeginAnimation(axis, new DoubleAnimationUsingKeyFrames
+                {
+                    BeginTime = begin, RepeatBehavior = repeat, FillBehavior = FillBehavior.Stop,
+                    KeyFrames = { new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)),
+                                  new EasingDoubleKeyFrame(axis == ScaleTransform.ScaleXProperty ? 1.25 : 1.6, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1100)), Ease),
+                                  new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1700))) },
+                });
+        };
+    }
+
+    /// <summary>
+    /// Equalizer bar: bounces its height while visible, starting after this delay (ms), and stops when hidden.
+    /// Three of them with different delays make the logo dance (the "Updating" screen).
+    /// </summary>
+    public static readonly DependencyProperty BounceProperty = DependencyProperty.RegisterAttached(
+        "Bounce", typeof(double), typeof(Motion), new PropertyMetadata(double.NaN, OnBounceChanged));
+
+    public static double GetBounce(DependencyObject d) => (double)d.GetValue(BounceProperty);
+    public static void SetBounce(DependencyObject d, double value) => d.SetValue(BounceProperty, value);
+
+    private static void OnBounceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not FrameworkElement bar || !double.IsNaN((double)e.OldValue)) return;
+        var scale = new ScaleTransform(1, 1);
+        bar.RenderTransform = scale;
+        bar.RenderTransformOrigin = new Point(0.5, 1);
+        bar.IsVisibleChanged += (_, args) =>
+        {
+            if (args.NewValue is not true)
+            {
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                return;
+            }
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(1, 0.3, TimeSpan.FromMilliseconds(420))
+            {
+                BeginTime = TimeSpan.FromMilliseconds(GetBounce(bar)),
+                AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = Freeze(new SineEase { EasingMode = EasingMode.EaseInOut }),
+            });
+        };
+    }
+
     // ---- page transition ---------------------------------------------------------------------
 
     /// <summary>On the shell's page host: each new page fades in and rises slightly.</summary>
@@ -302,6 +406,48 @@ public static class Motion
             state.LastSet = next;
         }
         if (Scrolling.Count == 0) CompositionTarget.Rendering -= OnFrame;
+    }
+
+    // ---- eased sideways scrolling (shelf arrows) ----------------------------------------------
+
+    private sealed class Glide
+    {
+        public double From, Target;
+        public TimeSpan Start = TimeSpan.MinValue;
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ScrollViewer, Glide> Glides = new();
+    private static readonly HashSet<ScrollViewer> Gliding = [];
+    private const double GlideMs = 420;
+
+    /// <summary>
+    /// Scrolls a row sideways by <paramref name="delta"/> with an eased glide (always, whatever the Performance
+    /// setting). Clicking again mid-glide carries on from where it is to the further target.
+    /// </summary>
+    public static void GlideHorizontally(ScrollViewer viewer, double delta)
+    {
+        var glide = Glides.GetOrCreateValue(viewer);
+        double baseTarget = Gliding.Contains(viewer) ? glide.Target : viewer.HorizontalOffset;
+        glide.From = viewer.HorizontalOffset;
+        glide.Target = Math.Clamp(baseTarget + delta, 0, viewer.ScrollableWidth);
+        glide.Start = TimeSpan.MinValue; // set on the next frame
+        if (Math.Abs(glide.Target - glide.From) < 0.5) return;
+        if (Gliding.Add(viewer) && Gliding.Count == 1) CompositionTarget.Rendering += OnGlideFrame;
+    }
+
+    private static void OnGlideFrame(object? sender, EventArgs e)
+    {
+        var now = ((RenderingEventArgs)e).RenderingTime;
+        foreach (var viewer in Gliding.ToList())
+        {
+            var glide = Glides.GetOrCreateValue(viewer);
+            if (glide.Start == TimeSpan.MinValue) glide.Start = now;
+            double p = Math.Clamp((now - glide.Start).TotalMilliseconds / GlideMs, 0, 1);
+            double eased = 1 - Math.Pow(1 - p, 4);
+            viewer.ScrollToHorizontalOffset(glide.From + (glide.Target - glide.From) * eased);
+            if (p >= 1 || !viewer.IsLoaded) Gliding.Remove(viewer);
+        }
+        if (Gliding.Count == 0) CompositionTarget.Rendering -= OnGlideFrame;
     }
 
     // ---- display refresh rate ----------------------------------------------------------------

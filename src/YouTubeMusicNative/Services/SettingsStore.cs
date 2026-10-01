@@ -24,17 +24,14 @@ public sealed class AppSettings
     /// <summary>If music was playing when the app closed, start it again (same song, position and queue) at startup.</summary>
     public bool ResumePlaybackOnStart { get; set; } = true;
 
-    /// <summary>Older builds' on/off "Use less memory" switch; only read to pick the first <see cref="Performance"/>.</summary>
-    public bool LowMemoryRendering { get; set; } = true;
-
     /// <summary>
-    /// How the app draws (applies on restart): "LessMemory" = CPU drawing, ~40 MB less memory (default);
-    /// "Standard" = GPU drawing; "Smooth" = GPU at the display's refresh rate plus eased scrolling, transitions and fades.
+    /// How the app draws (applies on restart): "LessMemory" = CPU drawing, ~40 MB less memory;
+    /// "Standard" = GPU drawing; "Smooth" (default) = GPU at the display's refresh rate plus eased scrolling, transitions and fades.
     /// </summary>
     public string? Performance { get; set; }
 
     [System.Text.Json.Serialization.JsonIgnore]
-    public string PerformanceMode => Performance ?? (LowMemoryRendering ? "LessMemory" : "Standard");
+    public string PerformanceMode => Performance ?? "Smooth";
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
     /// <summary>"Left"/"Right" when the mini player is docked (tucked) against that screen edge.</summary>
@@ -46,6 +43,9 @@ public sealed class AppSettings
     public bool CheckForUpdates { get; set; } = true;
     public bool InstallUpdatesOnExit { get; set; } = true;
     public string? LastUpdateAttempt { get; set; }
+
+    /// <summary>The version that ran last time; a newer one starting up shows "Updated to …".</summary>
+    public string? LastRunVersion { get; set; }
     public DateTime LastYtdlpUpdate { get; set; }
 }
 

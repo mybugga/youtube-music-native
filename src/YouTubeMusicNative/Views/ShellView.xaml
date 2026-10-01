@@ -56,18 +56,37 @@
             </Grid>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <!-- A downloaded update: one click installs it and reopens the app. -->
-                <Button Style="{StaticResource AccentPill}" Padding="12,5" Margin="0,18,10,0" VerticalAlignment="Top" FontSize="12"
-                        WindowChrome.IsHitTestVisibleInChrome="True" Command="{Binding Updates.RestartToUpdateCommand}"
-                        Visibility="{Binding Updates.IsUpdateReady, Converter={StaticResource BoolVis}}">
-                    <Button.ToolTip>
-                        <TextBlock Text="{Binding Updates.ReadyVersion, StringFormat='Version {0} is ready. Restart the app to update.'}"/>
-                    </Button.ToolTip>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE896;" FontFamily="{StaticResource Icons}" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Update"/>
+                <!-- An update downloading in the background: a small progress ring and percentage. -->
+                <Border Margin="0,18,10,0" VerticalAlignment="Top" Height="28" CornerRadius="14" Padding="8,0,12,0"
+                        Background="#1FFFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1"
+                        WindowChrome.IsHitTestVisibleInChrome="True" v:Motion.EnterFrom="18,0"
+                        Visibility="{Binding Updates.IsDownloading, Converter={StaticResource BoolVis}}">
+                    <Border.ToolTip>
+                        <TextBlock Text="{Binding Updates.DownloadingVersion, StringFormat='Downloading version {0} in the background'}"/>
+                    </Border.ToolTip>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <v:ProgressArc Width="16" Height="16" Thickness="2" Stroke="{StaticResource Accent}" Track="#33FFFFFF"
+                                       Value="{Binding Updates.DownloadProgress}"/>
+                        <TextBlock Text="Downloading update" FontSize="12" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Updates.DownloadPercent}" FontSize="12" Foreground="{StaticResource TextDim}" Margin="6,0,0,0"
+                                   VerticalAlignment="Center" MinWidth="30" TextOptions.TextFormattingMode="Display"/>
                     </StackPanel>
-                </Button>
+                </Border>
+                <!-- A downloaded update: one click installs it and reopens the app. It slides in, then pulses a few times. -->
+                <Grid Margin="0,18,10,0" VerticalAlignment="Top" v:Motion.EnterFrom="18,0"
+                      Visibility="{Binding Updates.IsUpdateReady, Converter={StaticResource BoolVis}}">
+                    <Border CornerRadius="16" Background="{StaticResource Accent}" IsHitTestVisible="False" v:Motion.Pulse="True"/>
+                    <Button Style="{StaticResource AccentPill}" Padding="12,5" FontSize="12"
+                            WindowChrome.IsHitTestVisibleInChrome="True" Command="{Binding Updates.RestartToUpdateCommand}">
+                        <Button.ToolTip>
+                            <TextBlock Text="{Binding Updates.ReadyVersion, StringFormat='Version {0} is ready. Click to restart and update.'}"/>
+                        </Button.ToolTip>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE896;" FontFamily="{StaticResource Icons}" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Updates.ReadyVersion, StringFormat='Update to {0}'}"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
                 <Grid VerticalAlignment="Center" Margin="0,14,12,0">
                 <Button WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="{Binding Login.Account.Name, TargetNullValue=Account, FallbackValue=Account}"
@@ -200,6 +219,48 @@
 
         <!-- ============================================================ Player -->
         <v:NowPlayingBar Grid.Row="2"/>
+
+        <!-- ============================================================ Updated (first start after an update) -->
+        <Border Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="16,14,16,0" Panel.ZIndex="5"
+                Background="{StaticResource Elevated}" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="12" Padding="14,10,8,10"
+                v:Motion.EnterFrom="0,-28"
+                Visibility="{Binding Updates.JustUpdatedTo, Converter={StaticResource Vis}}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="30" ShadowDepth="6" Opacity="0.55" RenderingBias="Performance"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <Grid Width="28" Height="28" VerticalAlignment="Center">
+                    <Ellipse Fill="#1ED760"/>
+                    <TextBlock Text="&#xE73E;" FontFamily="{StaticResource Icons}" FontSize="14" Foreground="Black"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel Margin="12,0,18,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Updates.JustUpdatedTo, StringFormat='Updated to version {0}'}" FontWeight="Bold" FontSize="14"/>
+                    <TextBlock Text="You're on the latest YouTube Music Native." Style="{StaticResource Sub}" FontSize="12" Margin="0,1,0,0"/>
+                </StackPanel>
+                <Button Style="{StaticResource OutlinePill}" Content="What's new" FontSize="12" Padding="12,5" VerticalAlignment="Center"
+                        Command="{Binding Updates.OpenReleaseNotesCommand}"/>
+                <Button Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="11" Width="30" Height="30" Margin="4,0,0,0"
+                        VerticalAlignment="Center" ToolTip="Dismiss" Command="{Binding Updates.DismissUpdatedCommand}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ============================================================ Updating (after "Update to …") -->
+        <Grid Grid.RowSpan="3" Panel.ZIndex="20" Background="#F20A0A0A" v:Motion.EnterFrom="0,0"
+              Visibility="{Binding Updates.IsInstalling, Converter={StaticResource BoolVis}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" v:Motion.EnterFrom="0,16">
+                <!-- The logo's three bars, dancing like an equalizer -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Height="64">
+                    <Rectangle Width="14" Height="40" RadiusX="7" RadiusY="7" Fill="#E8213A" VerticalAlignment="Bottom" Margin="5,0" v:Motion.Bounce="0"/>
+                    <Rectangle Width="14" Height="64" RadiusX="7" RadiusY="7" Fill="#FF3355" VerticalAlignment="Bottom" Margin="5,0" v:Motion.Bounce="160"/>
+                    <Rectangle Width="14" Height="50" RadiusX="7" RadiusY="7" Fill="#C8102E" VerticalAlignment="Bottom" Margin="5,0" v:Motion.Bounce="320"/>
+                </StackPanel>
+                <TextBlock Text="{Binding Updates.ReadyVersion, StringFormat='Updating to version {0}'}" Style="{StaticResource H2}"
+                           HorizontalAlignment="Center" Margin="0,26,0,0"/>
+                <TextBlock Text="The app closes for a moment and opens again by itself." Style="{StaticResource Sub}" FontSize="14"
+                           HorizontalAlignment="Center" Margin="0,8,0,0"/>
+            </StackPanel>
+        </Grid>
 
         <!-- ============================================================ Dialog -->
         <Grid Grid.RowSpan="3" Visibility="{Binding Dialog, Converter={StaticResource Vis}}" Background="#B3000000"
