@@ -323,8 +323,13 @@ public partial class MiniPlayerWindow : Window
             CompleteSlide();
             _tucked = true;
         }
-        ShowTab(true);
-        SlideTo(parked, animate ? 200 : 0, Motion.EaseOut, done: () => { if (_tucked) SetCloaked(true); });
+        // The tab only appears once the player has slid away (not on top of it while it's still going).
+        SlideTo(parked, animate ? 200 : 0, Motion.EaseOut, done: () =>
+        {
+            if (!_tucked) return;
+            SetCloaked(true);
+            ShowTab(true);
+        });
     }
 
     private void Reveal()
@@ -366,17 +371,22 @@ public partial class MiniPlayerWindow : Window
         Tab.Visibility = Visibility.Visible;
         Tab.HorizontalAlignment = HorizontalAlignment.Stretch;
         Tab.VerticalAlignment = VerticalAlignment.Stretch;
+        // A see-through window so it can fade in; it draws its own rounded corners and hairline border.
+        Tab.Clip = new RectangleGeometry(new Rect(0, 0, TabWidth, TabHeight), 8, 8);
+        var frame = new Grid();
+        frame.Children.Add(Tab);
+        frame.Children.Add(new Border
+        {
+            CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), IsHitTestVisible = false,
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
+        });
         _tabWindow = new Window
         {
             Width = TabWidth, Height = TabHeight, WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
-            ShowInTaskbar = false, Topmost = true, ShowActivated = false, Background = Brushes.Black,
-            DataContext = DataContext, Content = Tab, Title = "YouTube Music Native mini player tab",
+            AllowsTransparency = true, Background = Brushes.Transparent,
+            ShowInTaskbar = false, Topmost = true, ShowActivated = false,
+            DataContext = DataContext, Content = frame, Title = "YouTube Music Native mini player tab",
         };
-        WindowChrome.SetWindowChrome(_tabWindow, new WindowChrome
-        {
-            CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), GlassFrameThickness = new Thickness(0),
-        });
-        _tabWindow.SourceInitialized += (_, _) => MainWindow.ApplyWindowFrame(new WindowInteropHelper(_tabWindow).Handle);
         _tabWindow.MouseEnter += (_, _) =>
         {
             _hideTimer.Stop();
@@ -391,6 +401,7 @@ public partial class MiniPlayerWindow : Window
         if (_tabWindow is null) return;
         if (!show)
         {
+            _tabWindow.BeginAnimation(OpacityProperty, null);
             _tabWindow.Hide();
             return;
         }
@@ -403,7 +414,9 @@ public partial class MiniPlayerWindow : Window
         var area = WorkArea();
         _tabWindow.Left = _dock == Dock.Right ? area.Right - TabWidth : area.Left;
         _tabWindow.Top = Math.Clamp(Top + (CompactHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
+        _tabWindow.Opacity = 0;
         _tabWindow.Show();
+        _tabWindow.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
     }
 
     /// <summary>Ease-out that overshoots slightly and settles back (a small bounce).</summary>

@@ -313,11 +313,15 @@ public sealed partial class MainViewModel : ObservableObject
         else Navigate(AppPage.NowPlaying);
     }
 
-    /// <summary>The logo / app name: closes Now Playing (back to where you were), otherwise goes Home.</summary>
+    /// <summary>
+    /// The logo / app name: toggles Now Playing while something is playing (opens it, or goes back to where you were);
+    /// with nothing playing it goes Home.
+    /// </summary>
     [RelayCommand]
     private void LogoClick()
     {
         if (CurrentPageKind == AppPage.NowPlaying && CanGoBack) GoBack();
+        else if (Playback.NowPlaying is not null) Navigate(AppPage.NowPlaying);
         else if (CurrentPageKind != AppPage.Home) Navigate(AppPage.Home);
     }
 

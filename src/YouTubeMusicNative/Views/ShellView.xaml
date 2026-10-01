@@ -32,9 +32,10 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                <!-- Logo + name: click to leave Now Playing, or to go Home. The logo is live: its bars bounce while music plays. -->
+                <!-- Logo + name: opens / closes Now Playing while something plays, else goes Home.
+                     The logo is live: its bars bounce while music plays. -->
                 <Button Command="{Binding LogoClickCommand}" WindowChrome.IsHitTestVisibleInChrome="True" Cursor="Hand"
-                        Focusable="False" ToolTip="Home">
+                        Focusable="False" ToolTip="Now playing">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <StackPanel x:Name="Root" Orientation="Horizontal" Background="Transparent">
