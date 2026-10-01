@@ -27,7 +27,8 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="244"/>
                 <ColumnDefinition Width="4*" MaxWidth="480"/>
-                <ColumnDefinition Width="*" MinWidth="232"/>
+                <!-- Grows (from code) to fit the update pill when one shows, so it never slides under the search box. -->
+                <ColumnDefinition x:Name="RightColumn" Width="*" MinWidth="232"/>
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
@@ -55,7 +56,7 @@
                 </Grid>
             </Grid>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+            <StackPanel x:Name="RightGroup" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <!-- An update downloading in the background: a small progress ring and percentage. -->
                 <Border Margin="0,18,10,0" VerticalAlignment="Top" Height="28" CornerRadius="14" Padding="8,0,12,0"
                         Background="#1FFFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1"

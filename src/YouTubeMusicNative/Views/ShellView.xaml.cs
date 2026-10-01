@@ -17,6 +17,20 @@ public partial class ShellView : UserControl
             if (e.OldValue is MainViewModel old) old.FocusSearchRequested -= FocusSearch;
             if (e.NewValue is MainViewModel vm) vm.FocusSearchRequested += FocusSearch;
         };
+        RightGroup.LayoutUpdated += (_, _) => FitRightColumn();
+    }
+
+    /// <summary>
+    /// The title bar's right column is a share of the width, which fits the gear and window buttons but not an extra
+    /// update pill: widen it to whatever its buttons need so nothing slides under the search box (which shrinks instead).
+    /// </summary>
+    private void FitRightColumn()
+    {
+        double needed = 0;
+        foreach (UIElement child in RightGroup.Children)
+            if (child.Visibility != Visibility.Collapsed) needed += child.DesiredSize.Width;
+        needed = Math.Max(232, Math.Ceiling(needed));
+        if (Math.Abs(RightColumn.MinWidth - needed) > 0.5) RightColumn.MinWidth = needed;
     }
 
     /// <summary>Clicking the dimmed area around a dialog closes it.</summary>
