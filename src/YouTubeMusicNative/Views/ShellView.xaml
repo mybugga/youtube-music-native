@@ -40,7 +40,8 @@
                         <ControlTemplate TargetType="Button">
                             <StackPanel x:Name="Root" Orientation="Horizontal" Background="Transparent">
                                 <v:LiveLogo Width="28" Height="28" Playback="{Binding Playback}"/>
-                                <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
+                                <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"
+                                           Foreground="{StaticResource Text}"/>
                             </StackPanel>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsPressed" Value="True">
