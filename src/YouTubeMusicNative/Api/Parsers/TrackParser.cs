@@ -26,8 +26,8 @@ internal static class TrackParser
         var flex = r["flexColumns"] as JsonArray;
         var title = flex.Path("0.musicResponsiveListItemFlexColumnRenderer.text").Text();
 
-        var artists = new List<string>();
-        string? album = null, duration = null;
+        var artists = new List<ArtistRef>();
+        string? album = null, albumId = null, duration = null;
         var plainTexts = new List<string>();
 
         for (int col = 1; flex != null && col < flex.Count; col++)
@@ -42,9 +42,12 @@ internal static class TrackParser
                 var browseId = run.Str("navigationEndpoint.browseEndpoint.browseId");
 
                 if (pageType == "MUSIC_PAGE_TYPE_ARTIST" || pageType == "MUSIC_PAGE_TYPE_USER_CHANNEL" || browseId?.StartsWith("UC") == true)
-                    artists.Add(text);
-                else if (pageType == "MUSIC_PAGE_TYPE_ALBUM")
-                    album ??= text;
+                    artists.Add(new ArtistRef(text, browseId));
+                else if (pageType == "MUSIC_PAGE_TYPE_ALBUM" && album is null)
+                {
+                    album = text;
+                    albumId = browseId;
+                }
                 else if (JsonNav.DurationRegex().IsMatch(text))
                     duration ??= text;
                 else if (run?["navigationEndpoint"] is null && !TypeLabels.Contains(text) && !text.Contains(" plays") && !text.Contains(" views"))
@@ -57,12 +60,14 @@ internal static class TrackParser
 
         // Artists without links (e.g. "Various Artists", or uploads) show up as plain text.
         if (artists.Count == 0 && plainTexts.Count > 0)
-            artists.Add(plainTexts[0]);
+            artists.Add(new ArtistRef(plainTexts[0], null));
 
         var thumb = JsonNav.Thumbnail(r.Path("thumbnail.musicThumbnailRenderer.thumbnail.thumbnails"));
         var likeStatus = r.Path("menu.menuRenderer").FindFirst("likeButtonRenderer")?.Str("likeStatus");
-        return new Track(videoId, title, string.Join(", ", artists), album, duration, thumb)
+        return new Track(videoId, title, string.Join(", ", artists.Select(a => a.Name)), album, duration, thumb)
         {
+            ArtistLinks = artists,
+            AlbumId = albumId,
             SetVideoId = r.Str("playlistItemData.playlistSetVideoId"),
             Liked = likeStatus is null ? null : likeStatus == "LIKE",
         };
@@ -80,8 +85,8 @@ internal static class TrackParser
         var videoId = r.Str("videoId") ?? r.Str("navigationEndpoint.watchEndpoint.videoId");
         if (videoId is null) return null;
 
-        var artists = new List<string>();
-        string? album = null;
+        var artists = new List<ArtistRef>();
+        string? album = null, albumId = null;
         if (r.Path("longBylineText.runs") is JsonArray runs)
         {
             foreach (var run in runs)
@@ -89,19 +94,28 @@ internal static class TrackParser
                 var text = run.Str("text")?.Trim();
                 if (string.IsNullOrEmpty(text) || text == "•" || text == "&" || text == ",") continue;
                 var pageType = run.Str("navigationEndpoint.browseEndpoint.browseEndpointContextSupportedConfigs.browseEndpointContextMusicConfig.pageType");
-                if (pageType == "MUSIC_PAGE_TYPE_ALBUM") album ??= text;
-                else if (pageType is "MUSIC_PAGE_TYPE_ARTIST" or "MUSIC_PAGE_TYPE_USER_CHANNEL") artists.Add(text);
+                if (pageType == "MUSIC_PAGE_TYPE_ALBUM" && album is null)
+                {
+                    album = text;
+                    albumId = run.Str("navigationEndpoint.browseEndpoint.browseId");
+                }
+                else if (pageType is "MUSIC_PAGE_TYPE_ARTIST" or "MUSIC_PAGE_TYPE_USER_CHANNEL")
+                    artists.Add(new ArtistRef(text, run.Str("navigationEndpoint.browseEndpoint.browseId")));
             }
             if (artists.Count == 0 && runs.Count > 0 && runs[0].Str("text") is { } first)
-                artists.Add(first);
+                artists.Add(new ArtistRef(first, null));
         }
 
         return new Track(
             videoId,
             r["title"].Text(),
-            string.Join(", ", artists),
+            string.Join(", ", artists.Select(a => a.Name)),
             album,
             r["lengthText"].Text() is { Length: > 0 } len ? len : null,
-            JsonNav.Thumbnail(r.Path("thumbnail.thumbnails")));
+            JsonNav.Thumbnail(r.Path("thumbnail.thumbnails")))
+        {
+            ArtistLinks = artists,
+            AlbumId = albumId,
+        };
     }
 }

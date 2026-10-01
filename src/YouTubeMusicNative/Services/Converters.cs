@@ -122,6 +122,25 @@ public sealed class IndexConverter : IValueConverter
 }
 
 /// <summary>
+/// [track, the page's track list, its count] → the row's 1-based number. Counted by reference (the same song can be
+/// listed twice), and the count is only there so numbers refresh when rows are added or removed. Replaces
+/// AlternationIndex, which WPF gets wrong (999967…) after a list is cleared and refilled.
+/// </summary>
+public sealed class TrackNumberConverter : IMultiValueConverter
+{
+    public object Convert(object?[] values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values is not [var item, System.Collections.IList list, ..] || item is null) return "";
+        for (int i = 0; i < list.Count; i++)
+            if (ReferenceEquals(list[i], item)) return (i + 1).ToString();
+        return "";
+    }
+
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>
 /// [videoId, LikesVersion] → whether the song is liked. The version is only there so the binding
 /// re-evaluates when likes change. ConverterParameter "a|b" returns a (liked) or b instead of a bool.
 /// </summary>

@@ -1,43 +1,29 @@
 using System.IO;
 using System.Runtime.InteropServices;
-using Microsoft.Win32;
 
 namespace YouTubeMusicNative.Services;
 
 /// <summary>
-/// Reads the user's YouTube session straight from Firefox's cookie database (cookies.sqlite is not
-/// encrypted, unlike Chrome/Edge). Uses Windows' built-in winsqlite3.dll, so no extra dependency.
+/// Reads the user's YouTube session straight from a Firefox-family browser's cookie database (Firefox,
+/// LibreWolf, Waterfox, Floorp, Zen). Their cookies.sqlite is not encrypted, unlike Chromium's. Uses
+/// Windows' built-in winsqlite3.dll, so no extra dependency.
 /// </summary>
-public static class FirefoxCookies
+public static class GeckoCookies
 {
-    private static string ProfilesDir =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Mozilla", "Firefox", "Profiles");
-
-    /// <summary>Firefox is installed with at least one profile that has cookies.</summary>
-    public static bool IsAvailable => FindProfileDb() is not null;
-
-    /// <summary>True when Firefox is the default https handler (so "open in browser" lands in Firefox).</summary>
-    public static bool IsDefaultBrowser
-    {
-        get
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice");
-            return (key?.GetValue("ProgId") as string)?.StartsWith("Firefox", StringComparison.OrdinalIgnoreCase) == true;
-        }
-    }
+    /// <summary>The browser has at least one profile with a cookie database.</summary>
+    public static bool HasProfile(string profilesDir) => FindProfileDb(profilesDir) is not null;
 
     /// <summary>
-    /// youtube.com cookies as a Cookie header, or null if Firefox isn't signed in to YouTube.
-    /// Works while Firefox is running: the database (and its write-ahead log, where fresh
+    /// youtube.com cookies as a Cookie header, or null if the browser isn't signed in to YouTube.
+    /// Works while the browser is running: the database (and its write-ahead log, where fresh
     /// sign-in cookies land first) is copied to a temp folder and read from there.
     /// </summary>
-    public static string? ReadYouTubeCookieHeader()
+    public static string? ReadYouTubeCookieHeader(string profilesDir)
     {
-        var db = FindProfileDb();
+        var db = FindProfileDb(profilesDir);
         if (db is null) return null;
 
-        var temp = Path.Combine(Path.GetTempPath(), "YouTubeMusicNative-ff-" + Environment.ProcessId);
+        var temp = Path.Combine(Path.GetTempPath(), "YouTubeMusicNative-cookies-" + Environment.ProcessId);
         Directory.CreateDirectory(temp);
         var copy = Path.Combine(temp, "cookies.sqlite");
         try
@@ -72,10 +58,10 @@ public static class FirefoxCookies
     }
 
     /// <summary>The profile whose cookie database was written most recently (i.e. the one in use).</summary>
-    private static string? FindProfileDb()
+    private static string? FindProfileDb(string profilesDir)
     {
-        if (!Directory.Exists(ProfilesDir)) return null;
-        return Directory.EnumerateDirectories(ProfilesDir)
+        if (!Directory.Exists(profilesDir)) return null;
+        return Directory.EnumerateDirectories(profilesDir)
             .Select(d => Path.Combine(d, "cookies.sqlite"))
             .Where(File.Exists)
             .OrderByDescending(p => Max(File.GetLastWriteTimeUtc(p),

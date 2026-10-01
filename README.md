@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="YouTube Music Native logo" width="128">
+</p>
+
 # YouTube Music Native
 
 A fast, lightweight **native** YouTube Music player for Windows. It doesn't embed a browser and doesn't wrap Electron. The UI is
@@ -43,6 +47,10 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 - **Mini player**: compact, always on top. It has a drawer for Up next, Search and Library that hides itself when
   you move away. Drag it to a screen edge and it tucks away to a small cover tab.
 - Your library: like songs, create and delete playlists, add songs to playlists and remove them
+- **No account needed**: signed out, likes and playlists are kept on this PC (tagged *Local*). Signed in, when you
+  create a playlist you choose YouTube Music or this PC.
+- Your YouTube playlists are cached, so after signing out (or while YouTube can't be reached) they stay listed and
+  playable, tagged *Cached*. **Settings → Clear cache** removes them.
 - Picks up where you left off: the last queue, song and position come back on launch
 - Media keys and the Windows media overlay, tray icon, close to tray
 - Shortcuts: `Space` play/pause, `Ctrl+←/→` previous/next, `Ctrl+F` search, `Ctrl+L` queue, `Alt+←` back,
@@ -50,10 +58,14 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 
 ### Signing in
 
-Click the avatar in the title bar, then choose **Sign in with Firefox**. Google sign-in opens in Firefox. As soon as
-you're signed in there, the app picks up the session by itself, and it refreshes it on every start. Chrome and Edge
-encrypt their cookies, so for those, use *Other ways to sign in* to paste the `cookie` header or import a
-`cookies.txt`. Cookies are stored encrypted (DPAPI, your Windows account only) in `%LocalAppData%\YouTubeMusicNative`.
+Click the avatar in the title bar and pick a way to sign in:
+
+- **Sign in with your browser** (Firefox, LibreWolf, Waterfox, Floorp, Zen). Google sign-in opens there, and the app
+  picks up the session by itself as soon as you're signed in. It refreshes the session on every start.
+- **Sign in with Google**: a small sign-in window, for Chrome or Edge users (those browsers encrypt their cookies).
+- **Paste a cookie or import cookies.txt**, for advanced users.
+
+Cookies are stored encrypted (DPAPI, your Windows account only) in `%LocalAppData%\YouTubeMusicNative`.
 
 ## Keeping it light
 

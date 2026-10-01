@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -39,6 +40,81 @@ public partial class MiniPlayerWindow : Window
     private readonly MiniPanelViewModel _panel;
     private Dock _dock;
     private bool _tucked;
+    private ContextMenu? _openMenu; // a right-click menu of this window is open: the pointer is on it, not "away"
+
+    /// <summary>
+    /// Context menus and the Add-to-playlist popup are separate windows, so moving onto them counts as leaving the
+    /// mini player. While one is open the player must not tuck away or fold its drawer.
+    /// </summary>
+    private bool IsHeld => _openMenu is { IsOpen: true } || _vm.Dialog is not null;
+
+    static MiniPlayerWindow()
+    {
+        EventManager.RegisterClassHandler(typeof(ContextMenu), ContextMenu.OpenedEvent,
+            new RoutedEventHandler((s, _) => MenuOpened?.Invoke((ContextMenu)s)));
+        EventManager.RegisterClassHandler(typeof(ContextMenu), ContextMenu.ClosedEvent,
+            new RoutedEventHandler((s, _) => MenuClosed?.Invoke((ContextMenu)s)));
+    }
+
+    private static event Action<ContextMenu>? MenuOpened;
+    private static event Action<ContextMenu>? MenuClosed;
+
+    private void OnMenuOpened(ContextMenu menu)
+    {
+        if (menu.PlacementTarget is DependencyObject target && GetWindow(target) == this) _openMenu = menu;
+    }
+
+    private void OnMenuClosed(ContextMenu menu)
+    {
+        if (menu != _openMenu) return;
+        _openMenu = null;
+        ResumeAutoHide();
+    }
+
+    private bool _drawerOpenedForDialog;
+
+    /// <summary>
+    /// A dialog (Add to playlist…) shows over the whole mini player, so open the drawer for room while it's up and
+    /// fold it again afterwards if it was closed before.
+    /// </summary>
+    private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MainViewModel.Dialog)) return;
+        if (_vm.Dialog is not null)
+        {
+            _hideTimer.Stop();
+            _drawerHideTimer.Stop();
+            if (_tucked) Reveal();
+            if (!_drawerOpen)
+            {
+                _drawerOpenedForDialog = true;
+                SetDrawer(true, animate: true);
+            }
+            Activate();
+        }
+        else
+        {
+            if (_drawerOpenedForDialog && !_panel.IsExpanded) SetDrawer(false, animate: true);
+            _drawerOpenedForDialog = false;
+            ResumeAutoHide();
+        }
+    }
+
+    private void OnDialogBackdropClick(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _vm.CloseDialogCommand.Execute(null);
+    }
+
+    private void OnDialogCardClick(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    /// <summary>A menu or popup closed: if the pointer isn't back on the player, hide as if it just left.</summary>
+    public void ResumeAutoHide() => Dispatcher.BeginInvoke(() =>
+    {
+        if (IsMouseOver || IsHeld) return;
+        if (_drawerOpen && !_tucked) _drawerHideTimer.Start();
+        if (_dock != Dock.None) _hideTimer.Start();
+    }, DispatcherPriority.Background);
     private double _shiftedUp; // how far the window moved up to fit the open drawer on screen
     private double _fullHeight, _fullTop; // size/position to restore when sliding out of the tucked handle
 
@@ -83,7 +159,7 @@ public partial class MiniPlayerWindow : Window
         _drawerHideTimer.Tick += (_, _) =>
         {
             _drawerHideTimer.Stop();
-            if (!IsMouseOver && !SearchInput.IsKeyboardFocused && !_tucked) SetDrawer(false, animate: true);
+            if (!IsMouseOver && !IsHeld && !SearchInput.IsKeyboardFocused && !_tucked) SetDrawer(false, animate: true);
         };
         _drawerShowTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
         _drawerShowTimer.Tick += (_, _) =>
@@ -99,7 +175,7 @@ public partial class MiniPlayerWindow : Window
         {
             _hideTimer.Stop();
             // Don't hide while the user is typing a search.
-            if (_dock != Dock.None && !IsMouseOver && !SearchInput.IsKeyboardFocused) Tuck(animate: true);
+            if (_dock != Dock.None && !IsMouseOver && !IsHeld && !SearchInput.IsKeyboardFocused) Tuck(animate: true);
         };
 
         SourceInitialized += (_, _) =>
@@ -140,12 +216,19 @@ public partial class MiniPlayerWindow : Window
             _store.Settings.MiniTop = Top;
         };
 
+        MenuOpened += OnMenuOpened;
+        MenuClosed += OnMenuClosed;
+        vm.PropertyChanged += OnMainChanged;
+
         _seekBar = new SeekBar(SeekSlider, PositionText);
         _seekBar.Attach(vm.Playback);
         vm.Playback.PropertyChanged += OnPlaybackChanged;
         Closed += (_, _) =>
         {
             _seekBar.Attach(null);
+            MenuOpened -= OnMenuOpened;
+            MenuClosed -= OnMenuClosed;
+            vm.PropertyChanged -= OnMainChanged;
             vm.Playback.PropertyChanged -= OnPlaybackChanged;
             _hideTimer.Stop();
             _revealTimer.Stop();

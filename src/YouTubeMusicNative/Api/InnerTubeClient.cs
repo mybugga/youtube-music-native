@@ -71,6 +71,34 @@ public sealed class InnerTubeClient : IDisposable
         return PlaylistParser.ParseContinuation(json);
     }
 
+    /// <summary>The top card of an unfiltered search (an artist, album or playlist), or null.</summary>
+    public async Task<MediaItem?> SearchTopResultAsync(string query, CancellationToken ct = default)
+    {
+        var body = NewBody();
+        body["query"] = query;
+        var json = await PostAsync("search", body, null, ct);
+        return ArtistParser.ParseTopResult(json);
+    }
+
+    public async Task<ArtistPage> GetArtistAsync(string browseId, CancellationToken ct = default)
+    {
+        var json = await BrowseAsync(browseId, ct);
+        return ArtistParser.Parse(json, browseId);
+    }
+
+    /// <summary>The songs a Shuffle / Mix button plays (a watch playlist).</summary>
+    public async Task<List<Track>> GetWatchPlaylistAsync(WatchTarget target, CancellationToken ct = default)
+    {
+        var body = NewBody();
+        if (target.VideoId is { } videoId) body["videoId"] = videoId;
+        if (target.PlaylistId is { } playlistId) body["playlistId"] = playlistId;
+        if (target.Params is { } p) body["params"] = p;
+        body["isAudioOnly"] = true;
+        body["enablePersistentPlaylistPanel"] = true;
+        var json = await PostAsync("next", body, null, ct);
+        return TrackParser.ParsePanelItems(json);
+    }
+
     /// <summary>Radio ("up next") tracks seeded from a song. The first entry is usually the seed itself.</summary>
     public async Task<List<Track>> GetRadioAsync(string videoId, CancellationToken ct = default)
     {
@@ -334,7 +362,19 @@ public sealed class InnerTubeClient : IDisposable
                 req.Headers.TryAddWithoutValidation("X-Goog-PageId", session.PageId);
         }
 
-        using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        HttpResponseMessage resp;
+        try
+        {
+            resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+        {
+            // No response at all (no connection, DNS failure, timeout): let the app check whether it's offline.
+            Services.Connectivity.Instance.ReportFailure();
+            throw;
+        }
+        using var _ = resp;
+        Services.Connectivity.Instance.ReportSuccess();
         await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         var json = await JsonNode.ParseAsync(stream, cancellationToken: ct);
         if (!resp.IsSuccessStatusCode)

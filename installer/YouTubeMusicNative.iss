@@ -87,6 +87,8 @@ begin
   // Settings, sign-in and the resume snapshot live in %LocalAppData%\YouTubeMusicNative.
   if CurUninstallStep = usPostUninstall then
   begin
+    // "Start with Windows" entry written by the app itself.
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'YouTubeMusicNative');
     DataDir := ExpandConstant('{localappdata}\YouTubeMusicNative');
     if DirExists(DataDir) and not UninstallSilent then
       if MsgBox('Also remove your YouTube Music Native settings and sign-in?', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then

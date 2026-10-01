@@ -13,6 +13,7 @@ public sealed partial class SearchViewModel : TrackListViewModel
     private readonly InnerTubeClient api;
     private readonly SettingsStore _store;
     private readonly Action<string> _runQuery;
+    private readonly Action<MediaItem> _openItem;
     private ContinuationToken? _next;
     private CancellationTokenSource? _cts;
 
@@ -25,9 +26,12 @@ public sealed partial class SearchViewModel : TrackListViewModel
     private bool _hasSearched;
 
     /// <param name="runQuery">Puts a query in the search box and searches (used by recent searches).</param>
-    public SearchViewModel(InnerTubeClient api, PlaybackService playback, SettingsStore store, Action<string> runQuery)
+    /// <param name="openItem">Opens the top result (an artist, album or playlist page).</param>
+    public SearchViewModel(InnerTubeClient api, PlaybackService playback, SettingsStore store, Action<string> runQuery,
+        Action<MediaItem> openItem)
         : base(playback)
     {
+        _openItem = openItem;
         this.api = api;
         _store = store;
         _runQuery = runQuery;
@@ -40,6 +44,33 @@ public sealed partial class SearchViewModel : TrackListViewModel
     }
 
     public ObservableCollection<string> RecentSearches { get; }
+
+    /// <summary>YouTube's best match when it's an artist (or album / playlist), shown as a card above the songs.</summary>
+    [ObservableProperty] private MediaItem? _topResult;
+
+    [RelayCommand]
+    private void OpenTopResult()
+    {
+        if (TopResult is { } item) _openItem(item);
+    }
+
+    /// <summary>The top result's play button: an artist's top songs, or the album / playlist.</summary>
+    [RelayCommand]
+    private async Task PlayTopResultAsync()
+    {
+        if (TopResult is not { BrowseId: { } id } item) return;
+        try
+        {
+            List<Track> tracks = item.Kind == ItemKind.Artist
+                ? [.. (await api.GetArtistAsync(id)).TopSongs]
+                : [.. (await api.GetPlaylistAsync(id)).Tracks];
+            if (tracks.Count > 0) Playback.PlayList(tracks, 0);
+        }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException)
+        {
+            Playback.ShowStatus("Couldn't load that: " + ex.Message);
+        }
+    }
 
     /// <summary>Results for the current query; with an empty box the page shows recent searches instead.</summary>
     public bool ShowResults => HasSearched && Query.Trim().Length > 0;
@@ -94,9 +125,16 @@ public sealed partial class SearchViewModel : TrackListViewModel
         var ct = _cts.Token;
 
         IsLoading = false; // a new search supersedes any in-flight one
+        // The top result card comes from a second (unfiltered) search; a failure there just means no card.
+        var topTask = api.SearchTopResultAsync(q, ct);
         await RunAsync(async () =>
         {
             var page = await api.SearchSongsAsync(q, ct);
+            MediaItem? top = null;
+            try { top = await topTask; }
+            catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or TaskCanceledException) { }
+            if (ct.IsCancellationRequested) return;
+            TopResult = top;
             Tracks.Clear();
             foreach (var t in page.Tracks) Tracks.Add(t);
             _next = page.Next;

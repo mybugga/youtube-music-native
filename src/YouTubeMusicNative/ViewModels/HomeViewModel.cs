@@ -105,6 +105,9 @@ public sealed partial class HomeViewModel(
         else openPlaylist(item.ToPlaylist());
     }
 
+    /// <summary>The shared media card's play button (see the "Card" template).</summary>
+    public IAsyncRelayCommand<MediaItem> CardPlayCommand => PlayCommand;
+
     /// <summary>Card play button: plays a song, or the whole playlist/album/artist's top songs without navigating.</summary>
     [RelayCommand]
     private async Task PlayAsync(MediaItem? item)

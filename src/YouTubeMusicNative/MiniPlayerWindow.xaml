@@ -95,7 +95,8 @@
             </Grid.ColumnDefinitions>
 
             <!-- Cover (double-click: full player) -->
-            <Grid Width="108" Height="108" VerticalAlignment="Center" MouseLeftButtonDown="OnArtMouseDown">
+            <Grid x:Name="Cover" Width="108" Height="108" VerticalAlignment="Center" MouseLeftButtonDown="OnArtMouseDown" Background="Transparent"
+                  Tag="{Binding Playback.NowPlaying}" ContextMenu="{StaticResource NowPlayingMenu}">
                 <Border CornerRadius="8" Background="{StaticResource Elevated}">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.6" RenderingBias="Performance"/>
@@ -110,6 +111,27 @@
                 <Border CornerRadius="8" Background="#99000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
                     <v:Spinner Width="34" Height="34" Thickness="3"/>
                 </Border>
+                <!-- Play / pause on the cover: shows on hover, and stays while paused -->
+                <Button x:Name="CoverPlay" Width="44" Height="44" FontSize="16" ToolTip="Play / Pause (Space)"
+                        Command="{Binding PlayPauseCommand}"
+                        Content="{Binding Playback.IsPaused, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE768;|&#xE769;}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PlayButton}">
+                            <Setter Property="Opacity" Value="0"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=Cover}" Value="True">
+                                    <Setter Property="Opacity" Value="1"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Playback.IsPaused}" Value="True">
+                                    <Setter Property="Opacity" Value="1"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Playback.IsBuffering}" Value="True">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
             </Grid>
 
             <Grid Grid.Column="1" Margin="16,0,0,0">
@@ -131,7 +153,7 @@
                     <StackPanel>
                         <TextBlock Text="{Binding Playback.NowPlaying.Title, TargetNullValue='Nothing playing', FallbackValue='Nothing playing'}"
                                    Style="{StaticResource Title}" FontSize="15" FontWeight="Bold"/>
-                        <TextBlock Text="{Binding Playback.NowPlaying.Artists}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"
+                        <TextBlock v:ArtistLinks.Track="{Binding Playback.NowPlaying}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"
                                    Foreground="#BFFFFFFF"/>
                     </StackPanel>
                 </DockPanel>
@@ -143,19 +165,22 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+                    <!-- Play / pause lives on the cover; here: shuffle, previous, next, repeat -->
                     <StackPanel Orientation="Horizontal">
+                        <ToggleButton Style="{StaticResource ModeToggle}" Content="&#xE8B1;" ToolTip="Shuffle"
+                                      IsChecked="{Binding Playback.Queue.Shuffle}"/>
                         <Button Style="{StaticResource IconButton}" Content="&#xE892;" FontSize="16" Foreground="#E6FFFFFF" ToolTip="Previous"
-                                Command="{Binding PreviousCommand}"/>
-                        <Button Style="{StaticResource PlayButton}" Width="38" Height="38" FontSize="15" Margin="6,0"
-                                Command="{Binding PlayPauseCommand}"
-                                Content="{Binding Playback.IsPaused, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE768;|&#xE769;}"/>
+                                Margin="2,0,0,0" Command="{Binding PreviousCommand}"/>
                         <Button Style="{StaticResource IconButton}" Content="&#xE893;" FontSize="16" Foreground="#E6FFFFFF" ToolTip="Next"
-                                Command="{Binding NextCommand}"/>
+                                Margin="2,0,0,0" Command="{Binding NextCommand}"/>
+                        <ToggleButton Style="{StaticResource ModeToggle}" ToolTip="Repeat (off / all / one)" Margin="2,0,0,0"
+                                      Content="{Binding Playback.Queue.Repeat, Converter={StaticResource RepeatGlyph}}"
+                                      IsChecked="{Binding Playback.Queue.Repeat, Mode=OneWay, Converter={StaticResource RepeatActive}}"
+                                      Command="{Binding CycleRepeatCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <Button Style="{StaticResource IconButton}" FontSize="15"
-                            Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}"
-                            Visibility="{Binding Actions.IsLoggedIn, Converter={StaticResource BoolVis}}">
+                            Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}">
                         <Button.Content>
                             <MultiBinding Converter="{StaticResource Liked}" ConverterParameter="&#xE00B;|&#xE006;">
                                 <Binding Path="Playback.NowPlaying.VideoId"/>
@@ -293,8 +318,7 @@
                 <Grid Visibility="{Binding OpenPlaylist, Converter={StaticResource Vis}, ConverterParameter=invert}">
                     <ListBox Style="{StaticResource TrackList}" Margin="4,0,4,4" ItemsSource="{Binding Main.Library.Playlists}"
                              ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
-                             v:ListBehaviors.ActivateCommand="{Binding ShowPlaylistCommand}"
-                             Visibility="{Binding Main.Library.IsLoggedIn, Converter={StaticResource BoolVis}}">
+                             v:ListBehaviors.ActivateCommand="{Binding ShowPlaylistCommand}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Button Style="{StaticResource RowButton}" Padding="8,6" CommandParameter="{Binding}"
@@ -314,7 +338,10 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" Style="{StaticResource Title}" FontWeight="Normal" FontSize="14"/>
-                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" FontSize="12" Margin="0,2,0,0"/>
+                                            <DockPanel Margin="0,2,0,0">
+                                                <ContentControl DockPanel.Dock="Left" Style="{StaticResource TagBadge}" Content="{Binding Tag}"/>
+                                                <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" FontSize="12"/>
+                                            </DockPanel>
                                         </StackPanel>
                                     </Grid>
                                 </Button>
@@ -324,13 +351,18 @@
                                         <Setter TargetName="TileGlyph" Property="Text" Value="&#xEB52;"/>
                                         <Setter TargetName="TileGlyph" Property="Foreground" Value="White"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding PlaylistId}" Value="local:liked">
+                                        <Setter TargetName="Tile" Property="Background" Value="#7A45E6"/>
+                                        <Setter TargetName="TileGlyph" Property="Text" Value="&#xEB52;"/>
+                                        <Setter TargetName="TileGlyph" Property="Foreground" Value="White"/>
+                                    </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                     <TextBlock Style="{StaticResource Sub}" TextAlignment="Center" TextWrapping="Wrap" TextTrimming="None" Margin="32,36"
-                               VerticalAlignment="Top" Text="Sign in from the full player to see your playlists here."
-                               Visibility="{Binding Main.Library.IsLoggedIn, Converter={StaticResource Vis}, ConverterParameter=invert, FallbackValue=Collapsed}"/>
+                               VerticalAlignment="Top" Text="No playlists yet. Create one in the full player, or sign in there for your YouTube library."
+                               Visibility="{Binding Main.Library.Playlists.Count, Converter={StaticResource Vis}, ConverterParameter=invert, FallbackValue=Collapsed}"/>
                 </Grid>
 
                 <!-- One playlist -->
@@ -395,6 +427,20 @@
                     </ScaleTransform>
                 </Rectangle.RenderTransform>
             </Rectangle>
+        </Grid>
+
+        <!-- ================================================= Dialog (Add to playlist, New playlist…) over the player -->
+        <Grid Grid.RowSpan="2" Background="#CC000000" Visibility="{Binding Dialog, Converter={StaticResource Vis}}"
+              MouseLeftButtonDown="OnDialogBackdropClick">
+            <Grid.InputBindings>
+                <KeyBinding Key="Escape" Command="{Binding CloseDialogCommand}"/>
+            </Grid.InputBindings>
+            <Border VerticalAlignment="Top" Margin="10" Background="{StaticResource Elevated}" CornerRadius="12"
+                    BorderBrush="#1FFFFFFF" BorderThickness="1" MouseLeftButtonDown="OnDialogCardClick">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,16,20,18">
+                    <ContentControl Content="{Binding Dialog}" Focusable="False"/>
+                </ScrollViewer>
+            </Border>
         </Grid>
     </Grid>
 </Window>

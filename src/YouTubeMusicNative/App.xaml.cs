@@ -20,6 +20,7 @@ public partial class App : Application
     private MiniPlayerWindow? _mini;
     private MainViewModel? _vm;
     private bool _sessionEnding;
+    private bool _exiting;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,10 +38,12 @@ public partial class App : Application
 
         DispatcherUnhandledException += (_, args) =>
         {
+            AppLog.Write("unhandled: " + args.Exception);
             _playback?.ShowStatus("Error: " + args.Exception.Message);
             args.Handled = true;
         };
 
+        Connectivity.Instance.Start();
         _store = new SettingsStore();
         _store.Load();
         if (UpdateService.InstallPendingAtStartup(_store))
@@ -66,17 +69,37 @@ public partial class App : Application
         _vm = new MainViewModel(_api, _store, _playback);
         _window = new MainWindow(_vm, _store);
         _media = new MediaControlsService(_window.Handle, _playback);
-        _playback.RestoreSession(); // last session's track, paused where it was left
+        bool wasPlaying = _playback.RestoreSession(); // last session's track, paused where it was left
 
         _tray = new TrayService(_playback);
         _tray.ShowRequested += ShowMainWindow;
         _tray.MiniPlayerRequested += ShowMiniPlayer;
         _tray.ExitRequested += ExitApp;
         _vm.MiniPlayerRequested += ShowMiniPlayer;
+        _vm.RevealRequested += () =>
+        {
+            if (_window?.IsVisible != true) ShowMainWindow();
+        };
         _vm.Updates.ExitRequested += ExitApp;
         _window.Closed += (_, _) => Shutdown(); // only reached when close-to-tray is off or Exit was chosen
 
-        _window.Show();
+        // Come back the way the app was left. Started by Windows, that includes staying in the tray;
+        // started by hand, the user wants to see something, so the tray means the main window.
+        bool autostart = e.Args.Contains(StartupRegistration.Argument);
+        switch (_store.Settings.LastView)
+        {
+            case "Mini":
+                ShowMiniPlayer();
+                break;
+            case "Tray" when autostart:
+                _window.HideAndRelease();
+                break;
+            default:
+                ShowMainWindow();
+                break;
+        }
+        StartupRegistration.Refresh();
+        if (wasPlaying && _store.Settings.ResumePlaybackOnStart) _playback.Play();
         ListenForSecondInstance();
     }
 
@@ -84,6 +107,14 @@ public partial class App : Application
     {
         _mini?.Close();
         _window?.ShowFromTray();
+        SetLastView("Main");
+    }
+
+    private void SetLastView(string view)
+    {
+        if (_store is null) return;
+        _store.Settings.LastView = view;
+        _store.Save();
     }
 
     /// <summary>Swap the full window (whose UI is released to save memory) for the always-on-top mini player.</summary>
@@ -93,11 +124,17 @@ public partial class App : Application
         {
             _mini = new MiniPlayerWindow(_vm!, _store!);
             _mini.ExpandRequested += ShowMainWindow;
-            _mini.Closed += (_, _) => _mini = null;
+            // Closing the mini player keeps playing in the tray (ShowMainWindow sets "Main" right after, when switching).
+            _mini.Closed += (_, _) =>
+            {
+                _mini = null;
+                if (!_exiting) SetLastView("Tray");
+            };
         }
         _window?.HideAndRelease();
         _mini.Show();
         _mini.Activate();
+        SetLastView("Mini");
     }
 
     private void ListenForSecondInstance()
@@ -113,6 +150,9 @@ public partial class App : Application
 
     private void ExitApp()
     {
+        // Exit from the tray / mini player: remember which of the two it was, not the closing itself.
+        if (_mini is not null) _store!.Settings.LastView = "Mini";
+        _exiting = true;
         if (_window is not null)
         {
             _window.AllowClose = true;

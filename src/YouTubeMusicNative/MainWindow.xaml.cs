@@ -40,11 +40,13 @@ public partial class MainWindow : Window
         {
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
+        if (s.WindowMaximized) WindowState = WindowState.Maximized;
 
         SourceInitialized += (_, _) =>
         {
             ThumbnailConverter.DpiScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
             ApplyWindowFrame();
+            FitMaximized(); // StateChanged doesn't fire for a window that starts maximized
         };
         DpiChanged += (_, e) => ThumbnailConverter.DpiScale = e.NewDpi.DpiScaleX;
         StateChanged += (_, _) => FitMaximized();
@@ -70,6 +72,7 @@ public partial class MainWindow : Window
         if (!AllowClose && _store.Settings.CloseToTray)
         {
             e.Cancel = true;
+            _store.Settings.LastView = "Tray";
             HideAndRelease();
             return;
         }
@@ -184,8 +187,10 @@ public partial class MainWindow : Window
 
     private void SaveBounds()
     {
-        if (WindowState != WindowState.Normal || !IsVisible) return;
+        if (!IsVisible || WindowState == WindowState.Minimized) return;
         var s = _store.Settings;
+        s.WindowMaximized = WindowState == WindowState.Maximized;
+        if (WindowState != WindowState.Normal) return;
         s.WindowLeft = Left;
         s.WindowTop = Top;
         s.WindowWidth = Width;

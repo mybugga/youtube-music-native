@@ -46,6 +46,15 @@ public abstract partial class TrackListViewModel : ObservableObject
         else Play(track);
     }
 
+    /// <summary>"Open in player": the big Now Playing view; a song that isn't playing starts, with the rest of this list.</summary>
+    [RelayCommand]
+    private void OpenInPlayer(Track? track)
+    {
+        if (track is null) return;
+        if (track.VideoId != Playback.NowPlaying?.VideoId) Play(track);
+        LibraryActions.Instance?.OpenPlayerRequested?.Invoke();
+    }
+
     [RelayCommand]
     private void PlayNext(Track? track)
     {

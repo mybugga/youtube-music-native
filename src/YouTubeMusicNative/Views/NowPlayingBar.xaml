@@ -13,7 +13,8 @@
         </Grid.ColumnDefinitions>
 
         <!-- Track -->
-        <Grid VerticalAlignment="Center" Visibility="{Binding Playback.NowPlaying, Converter={StaticResource Vis}}">
+        <Grid VerticalAlignment="Center" Visibility="{Binding Playback.NowPlaying, Converter={StaticResource Vis}}"
+              Background="Transparent" Tag="{Binding Playback.NowPlaying}" ContextMenu="{StaticResource NowPlayingMenu}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -33,8 +34,7 @@
             <StackPanel Grid.Column="1" Margin="14,0,8,0" VerticalAlignment="Center">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Margin="8,0,0,0" FontSize="15"
-                            Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}"
-                            Visibility="{Binding Actions.IsLoggedIn, Converter={StaticResource BoolVis}}">
+                            Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}">
                         <Button.Content>
                             <MultiBinding Converter="{StaticResource Liked}" ConverterParameter="&#xE00B;|&#xE006;">
                                 <Binding Path="Playback.NowPlaying.VideoId"/>
@@ -56,7 +56,7 @@
                     </Button>
                     <TextBlock Text="{Binding Playback.NowPlaying.Title}" Style="{StaticResource Title}" VerticalAlignment="Center"/>
                 </DockPanel>
-                <TextBlock Text="{Binding Playback.NowPlaying.Artists}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"/>
+                <TextBlock v:ArtistLinks.Track="{Binding Playback.NowPlaying}" Style="{StaticResource Sub}" FontSize="12" Margin="0,3,0,0"/>
             </StackPanel>
         </Grid>
 

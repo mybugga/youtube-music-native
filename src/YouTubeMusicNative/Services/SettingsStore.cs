@@ -10,7 +10,7 @@ public sealed class AppSettings
     public double Volume { get; set; } = 70;
     public bool Autoplay { get; set; } = true;
     public bool CloseToTray { get; set; } = true;
-    /// <summary>"firefox" when signed in through the browser; the session is then re-read from Firefox at startup.</summary>
+    /// <summary>Where the sign-in came from: a Firefox-family browser (re-read at startup), the sign-in window, or a pasted cookie (null).</summary>
     public string? CookieSource { get; set; }
     /// <summary>Most recent first.</summary>
     public List<string> RecentSearches { get; set; } = [];
@@ -18,6 +18,11 @@ public sealed class AppSettings
     public double? WindowTop { get; set; }
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 760;
+    public bool WindowMaximized { get; set; }
+    /// <summary>What was on screen last: "Main", "Mini" or "Tray" (window closed to the tray). Restored at startup.</summary>
+    public string? LastView { get; set; }
+    /// <summary>If music was playing when the app closed, start it again (same song, position and queue) at startup.</summary>
+    public bool ResumePlaybackOnStart { get; set; } = true;
     public double? MiniLeft { get; set; }
     public double? MiniTop { get; set; }
     /// <summary>"Left"/"Right" when the mini player is docked (tucked) against that screen edge.</summary>
@@ -40,6 +45,8 @@ public sealed class SessionState
     public double Position { get; set; }
     public bool Shuffle { get; set; }
     public RepeatMode Repeat { get; set; }
+    /// <summary>Music was playing (not paused) when this was saved.</summary>
+    public bool WasPlaying { get; set; }
 }
 
 /// <summary>

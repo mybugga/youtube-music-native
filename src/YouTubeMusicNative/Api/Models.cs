@@ -13,7 +13,40 @@ public sealed record Track(
 
     /// <summary>Like status when the response included it (playlist rows); null = unknown.</summary>
     public bool? Liked { get; init; }
+
+    /// <summary>
+    /// The user's own playlist this song was opened from (with <see cref="SetVideoId"/>), so "Remove from playlist"
+    /// works from the player too, not only on the playlist page.
+    /// </summary>
+    public string? SourcePlaylistId { get; init; }
+    public string? SourcePlaylistTitle { get; init; }
+
+    /// <summary>The artists one by one, with their channel ids, so each name can link to the artist's page.</summary>
+    public IReadOnlyList<ArtistRef>? ArtistLinks { get; init; }
+
+    /// <summary>The album's browse id ("MPRE…"), so the album name can open the album.</summary>
+    public string? AlbumId { get; init; }
 }
+
+/// <summary>An artist credited on a song; <see cref="BrowseId"/> (a "UC…" channel id) is null for unlinked names.</summary>
+public sealed record ArtistRef(string Name, string? BrowseId);
+
+/// <summary>What a Shuffle / Mix button plays: a "next" (watch) request.</summary>
+public sealed record WatchTarget(string? VideoId, string? PlaylistId, string? Params);
+
+/// <summary>An artist's page: header, top songs, then shelves (albums, singles, videos, similar artists…).</summary>
+public sealed record ArtistPage(
+    string BrowseId,
+    string Name,
+    string? Audience,
+    string? Description,
+    string? BannerUrl,
+    string? ThumbnailUrl,
+    IReadOnlyList<Track> TopSongs,
+    string? TopSongsBrowseId,
+    IReadOnlyList<HomeSection> Sections,
+    WatchTarget? Shuffle,
+    WatchTarget? Mix);
 
 public sealed record PlaylistInfo(
     string BrowseId,
@@ -30,18 +63,38 @@ public sealed record PlaylistInfo(
     /// <summary>The signed-in user's own playlist (editable/deletable), as opposed to a saved one.</summary>
     public bool IsOwned { get; init; }
 
-    /// <summary>Liked Music and Episodes for Later are built in: they can't be deleted or removed.</summary>
-    public bool IsBuiltIn => PlaylistId is "LM" or "SE";
+    /// <summary>Liked Music and Episodes for Later (and the local liked songs) are built in: they can't be deleted or removed.</summary>
+    public bool IsBuiltIn => PlaylistId is "LM" or "SE" or "local:liked";
 
-    public bool CanDelete => IsOwned && !IsBuiltIn;
-    public bool CanRemoveFromLibrary => !IsOwned && !IsBuiltIn;
+    /// <summary>YouTube (live), a playlist kept on this PC, or a cached copy of a YouTube playlist (signed out / offline).</summary>
+    public PlaylistSource Source { get; init; }
+
+    public bool IsLocal => Source == PlaylistSource.Local;
+
+    /// <summary>"Local" / "Cached" badge in Your Library; null for live YouTube playlists.</summary>
+    public string? Tag => Source switch
+    {
+        PlaylistSource.Local => "Local",
+        PlaylistSource.Cached => "Cached",
+        _ => null,
+    };
+
+    public bool CanDelete => (IsOwned || IsLocal) && !IsBuiltIn && Source != PlaylistSource.Cached;
+    public bool CanRemoveFromLibrary => !IsOwned && !IsBuiltIn && Source == PlaylistSource.YouTube;
 }
+
+public enum PlaylistSource { YouTube, Local, Cached }
 
 /// <summary>The signed-in account (or brand channel) shown in the title bar and on the Account page.</summary>
 public sealed record AccountInfo(string Name, string? Handle, string? PhotoUrl);
 
 /// <summary>A playlist the user can add songs to.</summary>
-public sealed record PlaylistOption(string PlaylistId, string Title, string? Subtitle, string? ThumbnailUrl);
+public sealed record PlaylistOption(string PlaylistId, string Title, string? Subtitle, string? ThumbnailUrl)
+{
+    /// <summary>A playlist on this PC (shown with a "Local" tag in the Add to playlist list).</summary>
+    public bool IsLocal { get; init; }
+    public string? Tag => IsLocal ? "Local" : null;
+}
 
 public enum PlaylistPrivacy { Private, Unlisted, Public }
 

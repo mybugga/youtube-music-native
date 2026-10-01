@@ -17,6 +17,15 @@ public sealed partial class QueueViewModel(PlaybackService playback)
         Playback.PlayQueueIndex(Queue.Items.IndexOf(track));
     }
 
+    /// <summary>Play button on a row's art: plays the song, or pauses / resumes it if it's the current one.</summary>
+    [RelayCommand]
+    private void ArtPlay(Track? track)
+    {
+        if (track is null) return;
+        if (ReferenceEquals(track, Queue.Current)) Playback.TogglePause();
+        else Play(track);
+    }
+
     [RelayCommand]
     private void Remove(Track? track)
     {

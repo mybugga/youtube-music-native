@@ -36,19 +36,22 @@
                                 <Grid>
                                     <TextBlock Text="{Binding IsLikedSongs, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xEB52;|&#xE8D6;}"
                                                Style="{StaticResource Glyph}" FontSize="64" Foreground="White"
-                                               Visibility="{Binding Info.ThumbnailUrl, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                                               Visibility="{Binding ArtUrl, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
                                     <Border CornerRadius="6">
                                         <Border.Background>
-                                            <ImageBrush ImageSource="{Binding Info.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=200}" Stretch="UniformToFill"/>
+                                            <ImageBrush ImageSource="{Binding ArtUrl, Converter={StaticResource Thumb}, ConverterParameter=200}" Stretch="UniformToFill"/>
                                         </Border.Background>
                                     </Border>
                                 </Grid>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Bottom">
-                                <TextBlock Text="{Binding Info.KindLabel}" FontSize="13" FontWeight="SemiBold"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Info.KindLabel}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ContentControl Style="{StaticResource TagBadge}" Content="{Binding Tag}"/>
+                                </StackPanel>
                                 <TextBlock Text="{Binding Info.Title}" Style="{StaticResource Hero}" Margin="0,4,0,10"/>
                                 <TextBlock Style="{StaticResource Sub}" Foreground="#E6FFFFFF" FontSize="14">
-                                    <Run Text="{Binding Info.Subtitle, Mode=OneWay}" FontWeight="SemiBold"/>
+                                    <Run Text="{Binding HeaderSubtitle, Mode=OneWay}" FontWeight="SemiBold"/>
                                     <Run Text="{Binding TrackCountText, Mode=OneWay, StringFormat='  •  {0}'}"/>
                                 </TextBlock>
                             </StackPanel>

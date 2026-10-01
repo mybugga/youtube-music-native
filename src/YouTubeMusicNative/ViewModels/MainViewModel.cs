@@ -6,7 +6,7 @@ using YouTubeMusicNative.Services;
 
 namespace YouTubeMusicNative.ViewModels;
 
-public enum AppPage { Home, Search, Playlist, Account, NowPlaying }
+public enum AppPage { Home, Search, Playlist, Artist, Account, NowPlaying }
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -20,6 +20,12 @@ public sealed partial class MainViewModel : ObservableObject
     public HomeViewModel Home { get; }
     public SearchViewModel Search { get; }
     public LibraryViewModel Library { get; }
+
+    /// <summary>Playlists and liked songs kept on this PC (work signed out too).</summary>
+    public LocalLibrary Local { get; }
+
+    /// <summary>The saved copy of the YouTube library, shown as "Cached" when signed out or offline.</summary>
+    public LibraryCache Cache { get; }
     public QueueViewModel Queue { get; }
     public LoginViewModel Login { get; }
     public LibraryActions Actions { get; }
@@ -37,6 +43,36 @@ public sealed partial class MainViewModel : ObservableObject
     public bool CanGoBack => _historyIndex > 0;
     public bool CanGoForward => _historyIndex < _history.Count - 1;
     public bool IsLoggedIn => _api.IsLoggedIn;
+
+    /// <summary>Launch with Windows (per-user Run key), coming back as it was left.</summary>
+    public bool StartWithWindows
+    {
+        get => StartupRegistration.IsEnabled;
+        set
+        {
+            try
+            {
+                StartupRegistration.Set(value);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException)
+            {
+                Playback.ShowStatus("Couldn't change the startup setting: " + ex.Message);
+            }
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Music that was playing when the app closed starts again at the next launch.</summary>
+    public bool ResumePlaybackOnStart
+    {
+        get => _store.Settings.ResumePlaybackOnStart;
+        set
+        {
+            _store.Settings.ResumePlaybackOnStart = value;
+            _store.Save();
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>Closing the window keeps playing from the tray (settings, on the account page).</summary>
     public bool CloseToTray
@@ -64,15 +100,39 @@ public sealed partial class MainViewModel : ObservableObject
         {
             SearchText = query;
             SubmitSearch();
-        });
-        Library = new LibraryViewModel(api, OpenPlaylist);
+        }, item => OpenPlaylist(item.ToPlaylist()));
+        Views.ArtistLinks.OpenArtist = OpenArtist;
+        Views.ArtistLinks.OpenAlbum = (id, title, art) => OpenPlaylist(new PlaylistInfo(id, title ?? "Album", "Album", art));
+        Local = new LocalLibrary(store.Directory);
+        Cache = new LibraryCache(store.Directory);
+        Library = new LibraryViewModel(api, Local, Cache, OpenPlaylist);
         Queue = new QueueViewModel(playback);
-        Actions = new LibraryActions(api, playback);
+        Actions = new LibraryActions(api, playback, Local);
+        Local.Changed += () =>
+        {
+            foreach (var page in _history.Select(h => h.Page).OfType<PlaylistViewModel>().Distinct())
+                page.ReloadLocal();
+        };
         Actions.AddToPlaylistRequested = ShowAddToPlaylist;
+        Actions.OpenPlayerRequested = () =>
+        {
+            RevealRequested?.Invoke();
+            if (CurrentPageKind != AppPage.NowPlaying) Navigate(AppPage.NowPlaying);
+        };
         Actions.LikeChanged += (track, liked) =>
         {
             foreach (var page in _history.Select(h => h.Page).OfType<PlaylistViewModel>().Distinct())
                 page.OnLikeChanged(track, liked);
+        };
+        Actions.RemovedFromPlaylist += (playlistId, track) =>
+        {
+            foreach (var page in _history.Select(h => h.Page).OfType<PlaylistViewModel>().Distinct())
+                page.OnRemovedFromPlaylist(playlistId, track);
+        };
+        Actions.RemoveFailed += (playlistId, track) =>
+        {
+            foreach (var page in _history.Select(h => h.Page).OfType<PlaylistViewModel>().Distinct())
+                page.OnRemoveFailed(playlistId, track);
         };
         Login = new LoginViewModel(api, store, playback, OnLoggedInChanged);
         Login.TryRestore();
@@ -84,10 +144,36 @@ public sealed partial class MainViewModel : ObservableObject
             Search.SearchCommand.Execute(null);
         };
 
+        Connectivity.Instance.Reconnected += ReloadAfterReconnect;
+
         Navigate(AppPage.Home);
         _ = Library.EnsureLoadedAsync();
         _ = Login.LoadAccountAsync();
         _ = Actions.LoadLikesAsync();
+    }
+
+    /// <summary>Back online: load again whatever failed while the connection was down.</summary>
+    private void ReloadAfterReconnect()
+    {
+        if (Home.Error is not null || Home.Sections.Count == 0) Home.RefreshCommand.Execute(null);
+        if (IsLoggedIn && !Library.IsLive) Library.RefreshCommand.Execute(null);
+        if (IsLoggedIn && Login.Account is null) _ = Login.LoadAccountAsync();
+        if (IsLoggedIn) _ = Actions.LoadLikesAsync();
+        switch (CurrentPage)
+        {
+            case PlaylistViewModel { Error: not null } or PlaylistViewModel { Tag: "Cached" } when IsLoggedIn:
+                _ = ((PlaylistViewModel)CurrentPage!).LoadAsync();
+                break;
+            case PlaylistViewModel { Error: not null } playlist:
+                _ = playlist.LoadAsync();
+                break;
+            case ArtistViewModel { Error: not null } artist:
+                _ = artist.LoadAsync();
+                break;
+            case SearchViewModel { Error: not null } search:
+                search.SearchCommand.Execute(null);
+                break;
+        }
     }
 
     // ---- navigation -------------------------------------------------------------------------
@@ -126,14 +212,33 @@ public sealed partial class MainViewModel : ObservableObject
     public event Action? FocusSearchRequested;
 
     /// <summary>A playlist page view model not shown in this window (the mini player's library tab uses it).</summary>
-    public PlaylistViewModel CreatePlaylistPage(PlaylistInfo info) => new(_api, Playback, info);
+    public PlaylistViewModel CreatePlaylistPage(PlaylistInfo info) => new(_api, Playback, info, Local, Cache);
 
     public void OpenPlaylist(PlaylistInfo info)
     {
-        var vm = new PlaylistViewModel(_api, Playback, info);
+        // Artist cards (home feed, "Fans might also like", search) carry a channel id: open the artist page.
+        if (info.BrowseId.StartsWith("UC"))
+        {
+            OpenArtist(info.BrowseId, info.Title);
+            return;
+        }
+        var vm = CreatePlaylistPage(info);
         Push(AppPage.Playlist, vm);
         _ = vm.LoadAsync();
     }
+
+    /// <summary>The artist's page (from a clicked artist name, an artist card or the search top result).</summary>
+    public void OpenArtist(string browseId, string? name)
+    {
+        RevealRequested?.Invoke(); // clicked in the mini player: bring the full window up to show the page
+        if (CurrentPage is ArtistViewModel open && open.BrowseId == browseId) return;
+        var vm = new ArtistViewModel(_api, Playback, browseId, name, OpenPlaylist);
+        Push(AppPage.Artist, vm);
+        _ = vm.LoadAsync();
+    }
+
+    /// <summary>A page was opened from the mini player; the app shows the main window for it.</summary>
+    public event Action? RevealRequested;
 
     [RelayCommand(CanExecute = nameof(CanGoBack))]
     private void GoBack() => Show(--_historyIndex);
@@ -204,6 +309,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---- playlists & dialogs ----------------------------------------------------------------
 
+    /// <summary>Settings: forget the saved copy of the YouTube library (local playlists stay).</summary>
+    [RelayCommand]
+    private void ClearCache()
+    {
+        Cache.Clear();
+        Playback.ShowStatus("Cached library cleared");
+    }
+
     [RelayCommand]
     private void CloseDialog() => Dialog = null;
 
@@ -211,24 +324,32 @@ public sealed partial class MainViewModel : ObservableObject
     private void CreatePlaylist() => ShowCreatePlaylist(null);
 
     private void ShowCreatePlaylist(Track? firstSong) =>
-        Dialog = new CreatePlaylistDialog(_api, firstSong, () => Dialog = null, async (id, title) =>
+        Dialog = new CreatePlaylistDialog(_api, Local, firstSong, () => Dialog = null, (id, title, isLocal) =>
         {
             Playback.ShowStatus(firstSong is null ? $"Created {title}" : $"Created {title} with \"{firstSong.Title}\"");
-            var info = new PlaylistInfo("VL" + id, title, "Playlist", null) { IsOwned = true };
+            if (isLocal)
+            {
+                // Your Library lists it already (LocalLibrary.Changed).
+                OpenPlaylist(Library.Playlists.FirstOrDefault(p => p.BrowseId == id)
+                             ?? new PlaylistInfo(id, title, "Playlist", firstSong?.ThumbnailUrl) { Source = PlaylistSource.Local });
+                return;
+            }
+            var info = new PlaylistInfo("VL" + id, title, "Playlist", firstSong?.ThumbnailUrl) { IsOwned = true };
             // YouTube takes a moment to list a new playlist, so show it in the sidebar right away.
-            if (Library.Playlists.All(p => p.BrowseId != info.BrowseId))
-                Library.Playlists.Insert(Math.Min(1, Library.Playlists.Count), info);
+            Library.AddRemote(info);
             OpenPlaylist(info);
         });
 
     private void ShowAddToPlaylist(Track track)
     {
-        var dialog = new AddToPlaylistDialog(_api, track, () => Dialog = null, ShowCreatePlaylist, message =>
+        var dialog = new AddToPlaylistDialog(_api, Local, track, () => Dialog = null, ShowCreatePlaylist, (message, playlist, wasAdded) =>
         {
             Playback.ShowStatus(message);
-            // An open playlist page that just got the song is now stale.
+            if (!wasAdded || playlist.IsLocal) return; // local pages and the library update from LocalLibrary.Changed
+            // An open page of that playlist is now stale, and so is its library entry (art, song count).
             foreach (var page in _history.Select(h => h.Page).OfType<PlaylistViewModel>().Distinct())
-                if (message.EndsWith(page.Info.Title)) _ = page.LoadAsync();
+                if (page.Info.PlaylistId == playlist.PlaylistId) _ = page.LoadAsync();
+            Library.OnSongAdded(playlist.PlaylistId, track);
         });
         Dialog = dialog;
         _ = dialog.LoadAsync();
@@ -247,7 +368,20 @@ public sealed partial class MainViewModel : ObservableObject
             PlaylistInfo p => (p, p.IsOwned),
             _ => (null, false),
         };
-        if (info is null || info.IsBuiltIn) return;
+        if (info is null || info.IsBuiltIn || info.Source == PlaylistSource.Cached) return;
+
+        if (LocalLibrary.IsLocalId(info.BrowseId))
+        {
+            Dialog = new ConfirmDialog("Delete playlist?",
+                $"\"{info.Title}\" will be deleted from this PC. This can't be undone.",
+                "Delete", () =>
+                {
+                    Local.Delete(info.BrowseId);
+                    AfterPlaylistRemoved(info, $"Deleted {info.Title}");
+                    return Task.CompletedTask;
+                }, () => Dialog = null);
+            return;
+        }
 
         Dialog = owned
             ? new ConfirmDialog("Delete playlist?",
@@ -269,8 +403,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void AfterPlaylistRemoved(PlaylistInfo info, string message)
     {
         Playback.ShowStatus(message);
-        var match = Library.Playlists.FirstOrDefault(p => p.BrowseId == info.BrowseId);
-        if (match is not null) Library.Playlists.Remove(match);
+        Library.RemoveRemote(info.BrowseId);
         // Drop the deleted playlist's pages from history so Back can't return to them.
         for (int i = _history.Count - 1; i >= 0; i--)
         {

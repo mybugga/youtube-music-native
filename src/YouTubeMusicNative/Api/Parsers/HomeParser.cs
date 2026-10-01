@@ -7,27 +7,7 @@ internal static class HomeParser
 {
     public static HomePage Parse(JsonNode? root)
     {
-        var sections = new List<HomeSection>();
-        foreach (var shelf in root.FindAll("musicCarouselShelfRenderer"))
-        {
-            var header = shelf.Path("header.musicCarouselShelfBasicHeaderRenderer");
-            var title = header?["title"].Text() ?? "";
-            var strap = header?["strapline"].Text();
-
-            var items = new List<MediaItem>();
-            if (shelf["contents"] is JsonArray contents)
-            {
-                foreach (var c in contents)
-                {
-                    var item = c?["musicTwoRowItemRenderer"] is JsonObject two ? ParseTwoRow(two)
-                        : c?["musicResponsiveListItemRenderer"] is JsonObject row ? ParseSongRow(row)
-                        : null;
-                    if (item is not null) items.Add(item);
-                }
-            }
-            if (title.Length > 0 && items.Count > 0)
-                sections.Add(new HomeSection(title, string.IsNullOrEmpty(strap) ? null : strap, items));
-        }
+        var sections = root.FindAll("musicCarouselShelfRenderer").Select(ParseCarousel).OfType<HomeSection>().ToList();
 
         // The feed's own continuation lives on the section list (carousels don't paginate).
         var list = (JsonNode?)root.FindFirst("sectionListRenderer") ?? root.FindFirst("sectionListContinuation");
@@ -35,7 +15,30 @@ internal static class HomeParser
         return new HomePage(sections, next);
     }
 
-    private static MediaItem? ParseTwoRow(JsonObject r)
+    /// <summary>One carousel shelf (home feed, artist page): its title and cards; null if empty.</summary>
+    public static HomeSection? ParseCarousel(JsonObject shelf)
+    {
+        var header = shelf.Path("header.musicCarouselShelfBasicHeaderRenderer");
+        var title = header?["title"].Text() ?? "";
+        var strap = header?["strapline"].Text();
+
+        var items = new List<MediaItem>();
+        if (shelf["contents"] is JsonArray contents)
+        {
+            foreach (var c in contents)
+            {
+                var item = c?["musicTwoRowItemRenderer"] is JsonObject two ? ParseTwoRow(two)
+                    : c?["musicResponsiveListItemRenderer"] is JsonObject row ? ParseSongRow(row)
+                    : null;
+                if (item is not null) items.Add(item);
+            }
+        }
+        return title.Length > 0 && items.Count > 0
+            ? new HomeSection(title, string.IsNullOrEmpty(strap) ? null : strap, items)
+            : null;
+    }
+
+    public static MediaItem? ParseTwoRow(JsonObject r)
     {
         var title = r["title"].Text();
         var subtitle = r["subtitle"].Text();

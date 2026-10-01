@@ -30,7 +30,8 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Viewbox Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520">
-                    <Border Width="480" Height="480" CornerRadius="10" Background="{StaticResource Elevated}">
+                    <Border Width="480" Height="480" CornerRadius="10" Background="{StaticResource Elevated}"
+                            Tag="{Binding Playback.NowPlaying}" ContextMenu="{StaticResource NowPlayingMenu}">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="60" ShadowDepth="8" Opacity="0.55" RenderingBias="Performance"/>
                         </Border.Effect>
@@ -46,15 +47,50 @@
                                     Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
                                 <v:Spinner Width="72" Height="72" Thickness="5"/>
                             </Border>
+                            <!-- Click the cover to play / pause; the button shows on hover and while paused -->
+                            <Button Cursor="Hand" ToolTip="Play / Pause (Space)"
+                                    Command="{Binding DataContext.PlayPauseCommand, RelativeSource={RelativeSource AncestorType=v:ShellView}}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Grid Background="Transparent">
+                                            <Border x:Name="Shade" CornerRadius="10" Background="#40000000" Opacity="0"/>
+                                            <Grid x:Name="Badge" Width="96" Height="96" Opacity="0">
+                                                <Ellipse Fill="White">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect BlurRadius="24" ShadowDepth="2" Opacity="0.5" RenderingBias="Performance"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                                <TextBlock Style="{StaticResource Glyph}" FontSize="36" Foreground="Black" HorizontalAlignment="Center"
+                                                           Text="{Binding Playback.IsPaused, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE768;|&#xE769;}"/>
+                                            </Grid>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Shade" Property="Opacity" Value="1"/>
+                                                <Setter TargetName="Badge" Property="Opacity" Value="1"/>
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding Playback.IsPaused}" Value="True">
+                                                <Setter TargetName="Badge" Property="Opacity" Value="1"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Playback.IsBuffering}" Value="True">
+                                                <Setter TargetName="Badge" Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Playback.NowPlaying}" Value="{x:Null}">
+                                                <Setter TargetName="Badge" Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
                         </Grid>
                     </Border>
                 </Viewbox>
                 <StackPanel Grid.Row="1" Margin="0,28,0,0" HorizontalAlignment="Center" MaxWidth="520">
                     <TextBlock Text="{Binding Playback.NowPlaying.Title, TargetNullValue='Nothing playing', FallbackValue='Nothing playing'}"
                                Style="{StaticResource H1}" TextAlignment="Center" TextWrapping="Wrap" MaxHeight="84"/>
-                    <TextBlock Text="{Binding Playback.NowPlaying.Artists}" Style="{StaticResource Sub}" FontSize="16"
+                    <TextBlock v:ArtistLinks.Track="{Binding Playback.NowPlaying}" Style="{StaticResource Sub}" FontSize="16"
                                Foreground="#D9FFFFFF" TextAlignment="Center" Margin="0,6,0,0"/>
-                    <TextBlock Text="{Binding Playback.NowPlaying.Album}" Style="{StaticResource Sub}" TextAlignment="Center" Margin="0,4,0,0"/>
+                    <TextBlock v:ArtistLinks.Album="{Binding Playback.NowPlaying}" Style="{StaticResource Sub}" TextAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
             </Grid>
 

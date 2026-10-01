@@ -25,9 +25,10 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
     private bool _radioLoading;
     private int _consecutiveErrors;
     private string? _lastYtdlError;
-    private bool _stopped; // queue finished or gave up after errors; mpv is idle
+    private volatile bool _stopped; // queue finished, gave up after errors, or a restored session not started yet; mpv is idle
     private double? _resumeAt; // a restored track is shown but not loaded yet; Play starts it here
     private string? _retriedVideoId; // a track that already got its one automatic retry
+    private (Track Track, double Position)? _waitingForNetwork; // failed because we went offline; resumes on reconnect
     private readonly DispatcherTimer _sessionTimer;
 
     private sealed record PendingSeek(double Target, long Deadline);
@@ -81,6 +82,8 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
 
         _mpv.PositionChanged += pos =>
         {
+            // Nothing loaded yet (a restored session waiting for Play): mpv's idle 0 would wipe the saved position.
+            if (_stopped) return;
             // A network seek takes a moment; until mpv gets near the target it keeps reporting the old
             // position, which would make the seek bar snap back. Drop those (with a timeout as a safety net).
             if (_pendingSeek is { } seek)
@@ -94,12 +97,16 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
             _lastPostedPosition = pos;
             _ui.BeginInvoke(() =>
             {
+                if (_stopped) return;
                 // Posted before a seek that has since been requested? Then it's stale.
                 if (_pendingSeek is { } s && Math.Abs(pos - s.Target) > 1.5) return;
                 Position = pos;
             });
         };
-        _mpv.DurationChanged += d => _ui.BeginInvoke(() => Duration = d);
+        _mpv.DurationChanged += d => _ui.BeginInvoke(() =>
+        {
+            if (!_stopped) Duration = d; // same: keep the listed length while idle
+        });
         _mpv.PauseChanged += p => _ui.BeginInvoke(() => IsPaused = p);
         _mpv.BufferingChanged += b => _ui.BeginInvoke(() => IsBuffering = b);
         _mpv.FileLoaded += () => _ui.BeginInvoke(() =>
@@ -110,6 +117,23 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
             TimelineReset?.Invoke();
         });
         _mpv.TrackEnded += error => _ui.BeginInvoke(() => OnTrackEnded(error));
+        // A cover that failed to download is asked for again (see ThumbnailConverter).
+        ThumbnailConverter.RetryRequested += () =>
+        {
+            OnPropertyChanged(nameof(NowPlaying));
+            System.Windows.Data.CollectionViewSource.GetDefaultView(Queue.Items).Refresh();
+        };
+        Connectivity.Instance.Reconnected += () =>
+        {
+            // Art requested while offline failed: make everything showing the current song and the queue ask again.
+            OnPropertyChanged(nameof(NowPlaying));
+            _ = UpdateArtColorAsync(NowPlaying);
+            System.Windows.Data.CollectionViewSource.GetDefaultView(Queue.Items).Refresh();
+
+            if (_waitingForNetwork is not { } wait || !ReferenceEquals(wait.Track, NowPlaying)) return;
+            _waitingForNetwork = null;
+            Start(wait.Track, wait.Position);
+        };
         // mpv/yt-dlp warnings go to a small per-session log for troubleshooting playback failures.
         AppLog.Open(store.Directory);
         _mpv.Log += line =>
@@ -208,6 +232,7 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
     private void Start(Track? track, double startAt = 0)
     {
         if (track is null) return;
+        _waitingForNetwork = null;
         _stopped = false;
         _resumeAt = null;
         _pendingSeek = null;
@@ -223,6 +248,19 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
         TimelineReset?.Invoke();
         _ = ExtendWithRadioAsync();
         SaveSession();
+        _ = WaitIfOfflineAsync(track, startAt);
+    }
+
+    /// <summary>
+    /// Checks the connection as a song starts, so no internet shows up right away (offline screen, spinner on the
+    /// song) instead of after yt-dlp's long timeout. The song then starts by itself once the connection is back.
+    /// </summary>
+    private async Task WaitIfOfflineAsync(Track track, double startAt)
+    {
+        if (await Connectivity.Instance.CheckAsync() || !ReferenceEquals(track, NowPlaying)) return;
+        _waitingForNetwork = (track, startAt);
+        IsBuffering = true;
+        ShowStatus("No internet connection. Playback continues when you're back online.");
     }
 
     /// <summary>"3:32" / "1:02:03" to seconds; 0 when unknown.</summary>
@@ -255,6 +293,7 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
             Position = Math.Round(position, 1),
             Shuffle = Queue.Shuffle,
             Repeat = Queue.Repeat,
+            WasPlaying = !_stopped && !IsPaused,
         });
     }
 
@@ -262,11 +301,12 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
     /// Shows the last session's track, paused at its saved position, without loading anything:
     /// no network or audio work happens until the user presses Play.
     /// </summary>
-    public void RestoreSession()
+    /// <returns>True if music was playing when the session was saved.</returns>
+    public bool RestoreSession()
     {
-        if (_store.LoadSession() is not { Queue.Count: > 0 } session) return;
+        if (_store.LoadSession() is not { Queue.Count: > 0 } session) return false;
         Queue.Restore(session.Queue, session.Index, session.Shuffle, session.Repeat);
-        if (Queue.Current is not { } track) return;
+        if (Queue.Current is not { } track) return false;
 
         _stopped = true;
         // Pause mpv too: it starts unpaused, and its first pause report would otherwise flip the button to "playing".
@@ -278,10 +318,20 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
         _resumeAt = Duration > 0 && session.Position > Duration - 5 ? 0 : session.Position;
         Position = _resumeAt.Value;
         TimelineReset?.Invoke();
+        return session.WasPlaying;
     }
 
     private async void OnTrackEnded(bool error)
     {
+        // Lost the connection: don't burn the retry or skip through the queue; wait and carry on from here.
+        if (error && NowPlaying is { } current && !await Connectivity.Instance.CheckAsync())
+        {
+            _waitingForNetwork = (current, Position > 1 ? Position : 0);
+            IsBuffering = true;
+            ShowStatus("No internet connection. Playback continues when you're back online.");
+            return;
+        }
+
         // Stream URLs sometimes answer 403 once and work on a fresh resolve; retry before skipping the song.
         if (error && NowPlaying is { } failed && failed.VideoId != _retriedVideoId)
         {

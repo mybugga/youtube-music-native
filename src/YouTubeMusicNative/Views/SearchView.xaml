@@ -13,6 +13,63 @@
             <ListBox.Resources>
                 <DataTemplate DataType="{x:Type vm:SearchViewModel}">
                     <StackPanel Margin="8,24,8,8">
+                        <!-- Top result: the artist (or album / playlist) YouTube matched, like YouTube Music's big card -->
+                        <Border Background="{StaticResource Elevated}" CornerRadius="10" Margin="0,0,0,28" MaxWidth="760"
+                                HorizontalAlignment="Left" Visibility="{Binding TopResult, Converter={StaticResource Vis}}">
+                            <Button Style="{StaticResource RowButton}" Padding="18" Command="{Binding OpenTopResultCommand}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border x:Name="TopArt" Width="104" Height="104" CornerRadius="52" Background="{StaticResource ElevatedHover}">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="24" ShadowDepth="3" Opacity="0.5" RenderingBias="Performance"/>
+                                        </Border.Effect>
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding TopResult.IsArtist}" Value="False">
+                                                        <Setter Property="CornerRadius" Value="6"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Border CornerRadius="{Binding CornerRadius, ElementName=TopArt}">
+                                            <Border.Background>
+                                                <ImageBrush ImageSource="{Binding TopResult.ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=104}" Stretch="UniformToFill"/>
+                                            </Border.Background>
+                                        </Border>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="22,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding TopResult.Title}" FontSize="26" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding TopResult.Subtitle}" Style="{StaticResource Sub}" FontSize="14" Margin="0,4,0,0"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                            <Button Style="{StaticResource PillButton}" Padding="18,7" Command="{Binding PlayTopResultCommand}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="&#xE768;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="Play"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource OutlinePill}" Padding="18,7" Margin="10,0,0,0" Command="{Binding OpenTopResultCommand}">
+                                                <TextBlock>
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="Open"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding TopResult.IsArtist}" Value="True">
+                                                                    <Setter Property="Text" Value="View artist"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Border>
                         <TextBlock Text="Songs" Style="{StaticResource H2}"/>
                         <TextBlock Text="{Binding Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Margin="0,8,0,0"
                                    Visibility="{Binding Error, Converter={StaticResource Vis}}"/>

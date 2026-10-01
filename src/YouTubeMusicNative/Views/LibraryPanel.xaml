@@ -57,8 +57,7 @@
                         ToolTip="Refresh library" Command="{Binding Library.RefreshCommand}"
                         Visibility="{Binding Library.IsLoggedIn, Converter={StaticResource BoolVis}}"/>
                 <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE710;" FontSize="15"
-                        ToolTip="Create playlist" Command="{Binding CreatePlaylistCommand}" Margin="0,0,2,0"
-                        Visibility="{Binding Library.IsLoggedIn, Converter={StaticResource BoolVis}}"/>
+                        ToolTip="Create playlist" Command="{Binding CreatePlaylistCommand}" Margin="0,0,2,0"/>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE8F1;" Style="{StaticResource Glyph}" FontSize="20" Foreground="{StaticResource TextDim}"/>
                     <TextBlock Text="Your Library" FontSize="16" FontWeight="Bold" Margin="12,0,0,0" VerticalAlignment="Center"
@@ -66,22 +65,22 @@
                 </StackPanel>
             </DockPanel>
 
-            <!-- Signed out -->
-            <Border Grid.Row="1" VerticalAlignment="Top" Margin="8,8,8,0" Background="{StaticResource Elevated}" CornerRadius="8" Padding="20,18"
+            <DockPanel Grid.Row="1">
+            <!-- Signed out: local playlists still work; this offers the YouTube library -->
+            <Border DockPanel.Dock="Top" Margin="8,0,8,8" Background="{StaticResource Elevated}" CornerRadius="8" Padding="16,14"
                     Visibility="{Binding Library.IsLoggedIn, Converter={StaticResource Vis}, ConverterParameter=invert}">
                 <StackPanel>
-                    <TextBlock Text="Sign in to see your library" FontWeight="Bold" FontSize="15" TextWrapping="Wrap"/>
-                    <TextBlock Text="Your playlists, liked songs and a personal home feed." Style="{StaticResource Sub}"
-                               TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,16"/>
+                    <TextBlock Text="Sign in for your YouTube library" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                    <TextBlock Text="Playlists and likes you make now stay on this PC." Style="{StaticResource Sub}"
+                               TextWrapping="Wrap" TextTrimming="None" Margin="0,6,0,12"/>
                     <Button Style="{StaticResource PillButton}" Content="Sign in" HorizontalAlignment="Left" Padding="16,6" FontSize="13"
                             Command="{Binding SignInCommand}"/>
                 </StackPanel>
             </Border>
 
             <!-- Playlists -->
-            <ItemsControl Grid.Row="1" ItemsSource="{Binding Library.Playlists}" Margin="8,0,4,8"
-                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel"
-                          Visibility="{Binding Library.IsLoggedIn, Converter={StaticResource BoolVis}}">
+            <ItemsControl ItemsSource="{Binding Library.Playlists}" Margin="8,0,4,8"
+                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel">
                 <ItemsControl.Template>
                     <ControlTemplate TargetType="ItemsControl">
                         <ScrollViewer CanContentScroll="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
@@ -138,12 +137,18 @@
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="Name" Text="{Binding Title}" Style="{StaticResource Title}" FontWeight="Normal" FontSize="15"/>
-                                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" Margin="0,3,0,0"/>
+                                    <DockPanel Margin="0,3,0,0">
+                                        <ContentControl DockPanel.Dock="Left" Style="{StaticResource TagBadge}" Content="{Binding Tag}"/>
+                                        <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}"/>
+                                    </DockPanel>
                                 </StackPanel>
                             </Grid>
                         </Button>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding PlaylistId}" Value="LM">
+                                <Setter TargetName="LikedTile" Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding PlaylistId}" Value="local:liked">
                                 <Setter TargetName="LikedTile" Property="Visibility" Value="Visible"/>
                             </DataTrigger>
                             <DataTrigger Value="True">
@@ -160,6 +165,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </DockPanel>
 
             <TextBlock Grid.Row="1" Text="{Binding Library.Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap"
                        Margin="20,8" VerticalAlignment="Bottom" Visibility="{Binding Library.Error, Converter={StaticResource Vis}}"/>

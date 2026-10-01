@@ -3,163 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:v="clr-namespace:YouTubeMusicNative.Views"
              xmlns:vm="clr-namespace:YouTubeMusicNative.ViewModels"
+             xmlns:s="clr-namespace:YouTubeMusicNative.Services"
              Background="{StaticResource Bg}">
     <UserControl.Resources>
         <DataTemplate DataType="{x:Type vm:HomeViewModel}"><v:HomeView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:SearchViewModel}"><v:SearchView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaylistViewModel}"><v:PlaylistView/></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ArtistViewModel}"><v:ArtistView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:QueueViewModel}"><v:NowPlayingView/></DataTemplate>
         <DataTemplate DataType="{x:Type vm:LoginViewModel}"><v:LoginView/></DataTemplate>
-        <!-- ======================================================== Dialog cards -->
-        <Style x:Key="DialogTitle" TargetType="TextBlock" BasedOn="{StaticResource H2}">
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <DataTemplate DataType="{x:Type vm:AddToPlaylistDialog}">
-            <StackPanel>
-                <DockPanel>
-                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="12"
-                            ToolTip="Close" Command="{Binding CloseCommand}"/>
-                    <TextBlock Text="Add to playlist" Style="{StaticResource DialogTitle}"/>
-                </DockPanel>
-                <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,16">
-                    <Run Text="{Binding Track.Title, Mode=OneWay}" FontWeight="SemiBold" Foreground="White"/>
-                    <Run Text="{Binding Track.Artists, Mode=OneWay, StringFormat='  •  {0}'}"/>
-                </TextBlock>
-
-                <Button Style="{StaticResource RowButton}" Command="{Binding NewPlaylistCommand}">
-                    <StackPanel Orientation="Horizontal">
-                        <Border Width="44" Height="44" CornerRadius="4" Background="{StaticResource ElevatedHover}">
-                            <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="18"/>
-                        </Border>
-                        <TextBlock Text="New playlist" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                    </StackPanel>
-                </Button>
-
-                <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
-                    <ItemsControl ItemsSource="{Binding Playlists}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Style="{StaticResource RowButton}" CommandParameter="{Binding}"
-                                        Command="{Binding DataContext.AddCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="44"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="44" Height="44" CornerRadius="4" Background="{StaticResource ElevatedHover}">
-                                            <Grid>
-                                                <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="16" Foreground="{StaticResource TextFaint}"/>
-                                                <Border CornerRadius="4">
-                                                    <Border.Background>
-                                                        <ImageBrush ImageSource="{Binding ThumbnailUrl, Converter={StaticResource Thumb}, ConverterParameter=44}" Stretch="UniformToFill"/>
-                                                    </Border.Background>
-                                                </Border>
-                                            </Grid>
-                                        </Border>
-                                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}" Style="{StaticResource Title}" FontWeight="Normal" FontSize="15"/>
-                                            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Sub}" Margin="0,2,0,0"
-                                                       Visibility="{Binding Subtitle, Converter={StaticResource Vis}}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <StackPanel Orientation="Horizontal" Margin="8,12,0,4" Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}">
-                    <v:Spinner Width="16" Height="16" Thickness="2"/>
-                    <TextBlock Text="Loading your playlists…" Style="{StaticResource Sub}" Margin="10,0,0,0"/>
-                </StackPanel>
-                <TextBlock Text="You don't have any playlists yet. Create one above." Style="{StaticResource Sub}" Margin="8,12,0,4"
-                           Visibility="{Binding IsEmpty, Converter={StaticResource BoolVis}}"/>
-                <TextBlock Text="{Binding Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Margin="8,12,0,0"
-                           Visibility="{Binding Error, Converter={StaticResource Vis}}"/>
-            </StackPanel>
-        </DataTemplate>
-
-        <DataTemplate DataType="{x:Type vm:CreatePlaylistDialog}">
-            <StackPanel FocusManager.FocusedElement="{Binding ElementName=TitleBox}">
-                <DockPanel>
-                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="12"
-                            ToolTip="Close" Command="{Binding CloseCommand}"/>
-                    <TextBlock Text="New playlist" Style="{StaticResource DialogTitle}"/>
-                </DockPanel>
-                <TextBlock Style="{StaticResource Sub}" Margin="0,4,0,0" Visibility="{Binding FirstSong, Converter={StaticResource Vis}}">
-                    <Run Text="Starting with"/>
-                    <Run Text="{Binding FirstSong.Title, Mode=OneWay}" FontWeight="SemiBold" Foreground="White"/>
-                </TextBlock>
-
-                <TextBlock Text="Title" Style="{StaticResource Label}" Margin="0,18,0,6"/>
-                <Grid>
-                    <TextBox x:Name="TitleBox" Style="{StaticResource InputBox}" MaxLength="150"
-                             Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}">
-                        <TextBox.InputBindings>
-                            <KeyBinding Key="Enter" Command="{Binding CreateCommand}"/>
-                        </TextBox.InputBindings>
-                    </TextBox>
-                    <TextBlock Text="My playlist" Style="{StaticResource Sub}" FontSize="14" Margin="27,0,0,0" VerticalAlignment="Center"
-                               IsHitTestVisible="False" Visibility="{Binding Title, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
-                </Grid>
-
-                <TextBlock Text="Description (optional)" Style="{StaticResource Label}" Margin="0,14,0,6"/>
-                <TextBox Style="{StaticResource InputBox}" Height="72" TextWrapping="Wrap" AcceptsReturn="True" MaxLength="5000"
-                         VerticalScrollBarVisibility="Auto" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"/>
-
-                <TextBlock Text="Privacy" Style="{StaticResource Label}" Margin="0,14,0,8"/>
-                <ItemsControl ItemsSource="{Binding PrivacyOptions}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button x:Name="Option" Style="{StaticResource OutlinePill}" Content="{Binding}" Margin="0,0,8,0" Padding="16,6"
-                                    CommandParameter="{Binding}"
-                                    Command="{Binding DataContext.SetPrivacyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"/>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Value="True">
-                                    <DataTrigger.Binding>
-                                        <MultiBinding Converter="{StaticResource EqualsMulti}">
-                                            <Binding/>
-                                            <Binding Path="DataContext.Privacy" RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
-                                        </MultiBinding>
-                                    </DataTrigger.Binding>
-                                    <Setter TargetName="Option" Property="Style" Value="{StaticResource PillButton}"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <TextBlock Text="{Binding Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Margin="0,14,0,0"
-                           Visibility="{Binding Error, Converter={StaticResource Vis}}"/>
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
-                    <v:Spinner Width="18" Height="18" Thickness="2" Margin="0,0,14,0"
-                               Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"/>
-                    <Button Style="{StaticResource OutlinePill}" Content="Cancel" Command="{Binding CloseCommand}" Margin="0,0,8,0"/>
-                    <Button Style="{StaticResource PillButton}" Content="Create" Padding="22,8" Command="{Binding CreateCommand}"/>
-                </StackPanel>
-            </StackPanel>
-        </DataTemplate>
-
-        <DataTemplate DataType="{x:Type vm:ConfirmDialog}">
-            <StackPanel>
-                <TextBlock Text="{Binding Title}" Style="{StaticResource DialogTitle}"/>
-                <TextBlock Text="{Binding Message}" Style="{StaticResource Sub}" FontSize="14" TextWrapping="Wrap" TextTrimming="None"
-                           LineHeight="21" Margin="0,10,0,0"/>
-                <TextBlock Text="{Binding Error}" Foreground="{StaticResource Accent}" TextWrapping="Wrap" Margin="0,12,0,0"
-                           Visibility="{Binding Error, Converter={StaticResource Vis}}"/>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
-                    <v:Spinner Width="18" Height="18" Thickness="2" Margin="0,0,14,0"
-                               Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"/>
-                    <Button Style="{StaticResource OutlinePill}" Content="Cancel" Command="{Binding CloseCommand}" Margin="0,0,8,0"/>
-                    <Button Style="{StaticResource AccentPill}" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}"/>
-                </StackPanel>
-            </StackPanel>
-        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
@@ -179,10 +31,8 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                <Grid Width="28" Height="28">
-                    <Ellipse Fill="{StaticResource Accent}"/>
-                    <TextBlock Text="&#xE768;" Style="{StaticResource Glyph}" FontSize="11" Foreground="White" Margin="2,0,0,0"/>
-                </Grid>
+                <Image Source="pack://application:,,,/Assets/logo.png" Width="28" Height="28"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
                 <TextBlock Text="YouTube Music" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
                 <Button Style="{StaticResource IconButton}" Content="&#xE76B;" Margin="16,0,0,0" ToolTip="Go back"
                         Command="{Binding GoBackCommand}" WindowChrome.IsHitTestVisibleInChrome="True"/>
@@ -304,6 +154,49 @@
             <v:QueuePanel Grid.Column="2" Width="340" Margin="8,0,0,0" DataContext="{Binding Queue}"
                           Visibility="{Binding DataContext.IsQueueOpen, RelativeSource={RelativeSource AncestorType=v:ShellView}, Converter={StaticResource BoolVis}}"/>
         </Grid>
+
+        <!-- ============================================================ Offline -->
+        <!-- Covers the panels while YouTube can't be reached; fades away by itself once the connection is back. -->
+        <Border Grid.Row="1" Margin="8,0,8,0" CornerRadius="8" Background="#F2121212" Opacity="0" IsHitTestVisible="False"
+                DataContext="{x:Static s:Connectivity.Instance}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsOffline}" Value="True">
+                            <Setter Property="IsHitTestVisible" Value="True"/>
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.25"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.35"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380">
+                <Grid Width="96" Height="96" HorizontalAlignment="Center">
+                    <Ellipse Fill="{StaticResource Elevated}"/>
+                    <TextBlock Text="&#xE701;" Style="{StaticResource Glyph}" FontSize="34" Foreground="{StaticResource TextDim}"/>
+                </Grid>
+                <TextBlock Text="You're offline" Style="{StaticResource H2}" HorizontalAlignment="Center" Margin="0,24,0,0"/>
+                <TextBlock Text="Check your internet connection. Everything reloads by itself as soon as you're back online."
+                           Style="{StaticResource Sub}" FontSize="14" TextWrapping="Wrap" TextTrimming="None" TextAlignment="Center"
+                           LineHeight="21" Margin="0,8,0,0"/>
+                <!-- Reconnecting: three dots hopping in turn (animated only while offline) -->
+                <v:LoadingDots Fill="{StaticResource Accent}" HorizontalAlignment="Center" Margin="0,26,0,0"
+                               Visibility="{Binding IsOffline, Converter={StaticResource BoolVis}}"/>
+                <TextBlock Text="Reconnecting" Style="{StaticResource Sub}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
 
         <!-- ============================================================ Player -->
         <v:NowPlayingBar Grid.Row="2"/>

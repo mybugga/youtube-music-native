@@ -4,14 +4,19 @@ using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YouTubeMusicNative.Api;
+using System.Windows;
 using YouTubeMusicNative.Services;
+using YouTubeMusicNative.Views;
 
 namespace YouTubeMusicNative.ViewModels;
 
 public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore store, PlaybackService playback, Action loggedInChanged)
     : ObservableObject
 {
-    private const string FirefoxSource = "firefox";
+    // CookieSource values: "gecko|<browser name>|<profiles folder>" when the session is read from a Firefox-family
+    // browser (re-read at every start), "window" after the built-in sign-in window. "firefox" is the older form.
+    private const string LegacyFirefoxSource = "firefox";
+    private const string WindowSource = "window";
 
     // YouTube's own sign-in link: Google sign-in, then www.youtube.com/signin sets the youtube.com
     // session cookies, then lands on YouTube Music. "passive" skips the form if already signed in to Google.
@@ -29,14 +34,48 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
     [ObservableProperty] private string? _message;
     [ObservableProperty] private bool _isError;
     [ObservableProperty] private bool _isWaitingForBrowser;
+    [ObservableProperty] private string? _waitingBrowserName;
     [ObservableProperty] private bool _showManual;
 
     /// <summary>Name, handle and photo of the signed-in account (null until loaded / when signed out).</summary>
     [ObservableProperty] private AccountInfo? _account;
 
     public bool IsLoggedIn => api.IsLoggedIn;
-    public bool IsFirefoxAvailable => FirefoxCookies.IsAvailable;
-    public bool IsLinkedToFirefox => api.IsLoggedIn && store.Settings.CookieSource == FirefoxSource;
+
+    /// <summary>The ways to sign in on this PC, the one that suits the default browser first.</summary>
+    [ObservableProperty] private IReadOnlyList<SignInOption> _signInOptions = [];
+
+    /// <summary>Rebuilds the sign-in choices (browsers can be installed or the default changed while the app runs).</summary>
+    public void RefreshSignInOptions()
+    {
+        var current = DefaultBrowser.Current();
+        var options = new List<SignInOption>();
+        foreach (var browser in DefaultBrowser.InstalledGecko())
+        {
+            bool isDefault = browser.Name == current.Name;
+            options.Add(new SignInOption(SignInKind.Browser, $"Sign in with {browser.Name}",
+                $"Opens Google sign-in in {browser.Name}; the app picks the session up by itself (instantly if you're " +
+                $"already signed in there) and stays linked to it.",
+                "\uE774", isDefault ? "Your default browser" : null, browser));
+        }
+        options.Add(new SignInOption(SignInKind.Window, "Sign in with Google",
+            current.CanShareSession
+                ? "Signs in through a small Google window instead of your browser."
+                : $"Signs in through a small Google window. Works with any browser, including {current.Name}, whose saved sign-ins other apps can't read.",
+            "\uE77B", current.CanShareSession ? null : "Recommended", null));
+        options.Add(new SignInOption(SignInKind.Cookie, "Paste a cookie or import cookies.txt",
+            "For advanced users: copy the cookie header from your browser's developer tools.",
+            "\uE8C8", null, null));
+        // The default browser (or the Google window when the default can't share its session) goes first.
+        SignInOptions = options.OrderBy(o => o.Badge is null ? 1 : 0).ToList();
+    }
+
+    /// <summary>Signed in from a browser whose session is re-read at every start ("Linked to Firefox").</summary>
+    public bool IsLinkedToBrowser => api.IsLoggedIn && LinkedBrowser() is not null;
+
+    public string? LinkedBrowserName => LinkedBrowser()?.Name;
+
+    private string SignInWindowData => Path.Combine(store.Directory, "SignIn");
 
     /// <summary>
     /// Restores the session on startup. A Firefox-linked login is re-read from Firefox each time,
@@ -44,7 +83,8 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
     /// </summary>
     public void TryRestore()
     {
-        if (store.Settings.CookieSource == FirefoxSource && FirefoxCookies.ReadYouTubeCookieHeader() is { } fresh
+        RefreshSignInOptions();
+        if (LinkedBrowser() is { } linked && GeckoCookies.ReadYouTubeCookieHeader(linked.GeckoProfilesDir!) is { } fresh
             && Auth.Parse(fresh) is { } current)
         {
             api.Auth = current;
@@ -60,27 +100,83 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         }
     }
 
-    /// <summary>
-    /// Opens Google sign-in in Firefox, then watches Firefox's cookie store and completes the login as
-    /// soon as the YouTube session appears. If Firefox is already signed in, this finishes immediately.
-    /// </summary>
+    /// <summary>"Sign in" from elsewhere in the app: uses the first (best) option for this PC.</summary>
     [RelayCommand]
     private async Task SignInWithBrowserAsync()
     {
-        if (!FirefoxCookies.IsAvailable)
+        RefreshSignInOptions();
+        await SignInWithAsync(SignInOptions.First());
+    }
+
+    [RelayCommand]
+    private async Task SignInWithAsync(SignInOption? option)
+    {
+        switch (option?.Kind)
         {
-            ShowError("Firefox wasn't found. Sign in with a copied cookie instead (below).");
+            case SignInKind.Browser:
+                // The default browser opens a plain link; any other one is started by name.
+                bool isDefault = DefaultBrowser.Current().Name == option.Browser!.Name;
+                await SignInThroughGeckoAsync(option.Browser, launchExe: isDefault ? null : option.Browser.Exe);
+                break;
+            case SignInKind.Window:
+                SignInWithWindow();
+                break;
+            case SignInKind.Cookie:
+                ShowManual = !ShowManual;
+                break;
+        }
+    }
+
+    /// <summary>Google sign-in in a small window (WebView2), for browsers whose cookies can't be read.</summary>
+    private void SignInWithWindow()
+    {
+        _browserWait?.Cancel();
+        if (!GoogleSignInWindow.IsAvailable)
+        {
+            ShowError("The sign-in window needs the Microsoft Edge WebView2 runtime, which isn't installed. " +
+                      "Sign in with a copied cookie instead (below).");
             ShowManual = true;
             return;
         }
 
-        if (await TryCompleteFromFirefoxAsync())
+        IsError = false;
+        Message = null;
+        bool? signedIn;
+        var window = new GoogleSignInWindow(SignInUrl, SignInWindowData);
+        try
+        {
+            if (Application.Current.MainWindow is { IsVisible: true } owner) window.Owner = owner;
+            else window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            signedIn = window.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            // Commands swallow exceptions, so say what happened instead of silently doing nothing.
+            AppLog.Write("sign-in window: " + ex);
+            ShowError("The sign-in window couldn't open: " + ex.Message);
+            return;
+        }
+
+        if (signedIn == true && Auth.Parse(window.CookieHeader ?? "") is { } auth)
+            Complete(auth, WindowSource, "Signed in. Your library is now available.");
+        else if (window.Error is { } error)
+        {
+            ShowError(error + " Sign in with a copied cookie instead (below).");
+            ShowManual = true;
+        }
+    }
+
+    private async Task SignInThroughGeckoAsync(BrowserInfo browser, string? launchExe)
+    {
+        if (await TryCompleteFromGeckoAsync(browser))
             return;
 
         try
         {
-            // Launch Firefox explicitly (not just the default browser) because that's where we read cookies from.
-            Process.Start(new ProcessStartInfo("firefox.exe", SignInUrl) { UseShellExecute = true });
+            // The default browser for a plain URL; a named exe when it has to be a specific browser.
+            Process.Start(launchExe is null
+                ? new ProcessStartInfo(SignInUrl) { UseShellExecute = true }
+                : new ProcessStartInfo(launchExe, SignInUrl) { UseShellExecute = true });
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
@@ -90,6 +186,7 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         _browserWait?.Cancel();
         _browserWait = new CancellationTokenSource(PollTimeout);
         var ct = _browserWait.Token;
+        WaitingBrowserName = browser.Name;
         IsWaitingForBrowser = true;
         IsError = false;
         Message = null;
@@ -98,7 +195,7 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
             while (!ct.IsCancellationRequested)
             {
                 await Task.Delay(PollInterval, ct);
-                if (await TryCompleteFromFirefoxAsync()) return;
+                if (await TryCompleteFromGeckoAsync(browser)) return;
             }
         }
         catch (OperationCanceledException)
@@ -111,7 +208,7 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         }
 
         if (!api.IsLoggedIn && _browserWait?.IsCancellationRequested == true && Message is null)
-            ShowError("Didn't see a YouTube sign-in in Firefox. Try again, or use a copied cookie below.");
+            ShowError($"Didn't see a YouTube sign-in in {browser.Name}. Try again, or use a copied cookie below.");
     }
 
     [RelayCommand]
@@ -122,12 +219,22 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         IsError = false;
     }
 
-    private async Task<bool> TryCompleteFromFirefoxAsync()
+    private async Task<bool> TryCompleteFromGeckoAsync(BrowserInfo browser)
     {
-        var header = await Task.Run(FirefoxCookies.ReadYouTubeCookieHeader);
+        var dir = browser.GeckoProfilesDir!;
+        var header = await Task.Run(() => GeckoCookies.ReadYouTubeCookieHeader(dir));
         if (header is null || Auth.Parse(header) is not { } auth) return false;
-        Complete(auth, FirefoxSource, "Signed in with your Firefox session.");
+        Complete(auth, $"gecko|{browser.Name}|{dir}", $"Signed in with your {browser.Name} session.");
         return true;
+    }
+
+    /// <summary>The Firefox-family browser the saved session is linked to, if any.</summary>
+    private BrowserInfo? LinkedBrowser()
+    {
+        var source = store.Settings.CookieSource;
+        if (source == LegacyFirefoxSource) return new BrowserInfo("Firefox", DefaultBrowser.FirefoxProfiles);
+        if (source?.Split('|') is ["gecko", var name, var dir]) return new BrowserInfo(name, dir);
+        return null;
     }
 
     [RelayCommand]
@@ -156,9 +263,6 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         Login();
     }
 
-    [RelayCommand]
-    private void ToggleManual() => ShowManual = !ShowManual;
-
     /// <summary>Fetches the account name/photo for the title bar and this page.</summary>
     public async Task LoadAccountAsync()
     {
@@ -184,7 +288,9 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
         Account = null;
         api.Auth = null;
         store.ClearCookies();
+        if (store.Settings.CookieSource == WindowSource) GoogleSignInWindow.ClearSession(SignInWindowData);
         store.Settings.CookieSource = null;
+        RefreshSignInOptions();
         store.Save();
         playback.RefreshYtdlOptions();
         IsError = false;
@@ -216,6 +322,13 @@ public sealed partial class LoginViewModel(InnerTubeClient api, SettingsStore st
     private void RaiseLoginState()
     {
         OnPropertyChanged(nameof(IsLoggedIn));
-        OnPropertyChanged(nameof(IsLinkedToFirefox));
+        OnPropertyChanged(nameof(IsLinkedToBrowser));
+        OnPropertyChanged(nameof(LinkedBrowserName));
     }
 }
+
+public enum SignInKind { Browser, Window, Cookie }
+
+/// <summary>One way to sign in, as listed on the Account page.</summary>
+/// <param name="Badge">"Your default browser" / "Recommended", or null.</param>
+public sealed record SignInOption(SignInKind Kind, string Title, string Detail, string Glyph, string? Badge, BrowserInfo? Browser);

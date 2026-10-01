@@ -20,7 +20,8 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="40" MaxWidth="680" HorizontalAlignment="Left">
+        <!-- Grows with the window up to a readable width, then stays centred -->
+        <StackPanel Margin="40,40,40,40" MaxWidth="980" HorizontalAlignment="Stretch">
             <TextBlock Text="Account &amp; settings" Style="{StaticResource H1}" Margin="0,0,0,24"/>
 
             <!-- Signed in -->
@@ -52,9 +53,9 @@
                         <TextBlock Text="Your library, playlists, likes and personal home feed are available."
                                    Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,12,0,0"/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0"
-                                    Visibility="{Binding IsLinkedToFirefox, Converter={StaticResource BoolVis}}">
+                                    Visibility="{Binding IsLinkedToBrowser, Converter={StaticResource BoolVis}}">
                             <TextBlock Text="&#xE73E;" Style="{StaticResource Glyph}" FontSize="12" Foreground="#1ED760"/>
-                            <TextBlock Text="Linked to Firefox · refreshed automatically when the app starts" Style="{StaticResource Sub}"
+                            <TextBlock Text="{Binding LinkedBrowserName, StringFormat='Linked to {0} · refreshed automatically when the app starts'}" Style="{StaticResource Sub}"
                                        FontSize="12" Margin="8,0,0,0" TextWrapping="Wrap" TextTrimming="None"/>
                         </StackPanel>
                         <Button Style="{StaticResource OutlinePill}" HorizontalAlignment="Left" Margin="0,18,0,0" Padding="20,8"
@@ -70,67 +71,69 @@
 
             <!-- Signed out -->
             <StackPanel Visibility="{Binding IsLoggedIn, Converter={StaticResource Vis}, ConverterParameter=invert}">
-                <!-- Primary: sign in through Firefox -->
-                <Border Background="{StaticResource Elevated}" CornerRadius="8" Padding="28,24">
+                <!-- Pick how to sign in: Firefox-family browsers (session shared), the Google window, or a cookie -->
+                <Border Background="{StaticResource Elevated}" CornerRadius="8" Padding="28,24,28,16">
                     <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid Width="52" Height="52" Margin="0,0,18,0" VerticalAlignment="Top">
-                                <Ellipse>
-                                    <Ellipse.Fill>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                            <GradientStop Color="#FFBD4F" Offset="0"/>
-                                            <GradientStop Color="#FF5E3A" Offset="0.5"/>
-                                            <GradientStop Color="#9059FF" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Ellipse.Fill>
-                                </Ellipse>
-                                <TextBlock Text="&#xE774;" Style="{StaticResource Glyph}" FontSize="22" Foreground="White"/>
-                            </Grid>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="Sign in with your browser" FontWeight="Bold" FontSize="17"/>
-                                <TextBlock Style="{StaticResource Sub}" FontSize="14" TextWrapping="Wrap" TextTrimming="None" LineHeight="21" Margin="0,6,0,0"
-                                           Text="Opens Google sign-in in Firefox. As soon as you're signed in there, the app picks up the session automatically. If Firefox is already signed in to YouTube, it's instant."/>
-                            </StackPanel>
-                        </Grid>
+                        <TextBlock Text="Sign in to YouTube Music" FontWeight="Bold" FontSize="17"/>
+                        <TextBlock Text="Choose how you'd like to sign in." Style="{StaticResource Sub}" FontSize="14" Margin="0,4,0,12"/>
 
-                        <!-- Idle -->
-                        <Button Style="{StaticResource PillButton}" HorizontalAlignment="Left" Margin="70,20,0,0" Padding="24,11"
-                                Command="{Binding SignInWithBrowserCommand}"
-                                Visibility="{Binding IsWaitingForBrowser, Converter={StaticResource Vis}, ConverterParameter=invert}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource Icons}" Foreground="Black" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Sign in with Firefox" Foreground="Black"/>
-                            </StackPanel>
-                        </Button>
+                        <ItemsControl ItemsSource="{Binding SignInOptions}"
+                                      Visibility="{Binding IsWaitingForBrowser, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource RowButton}" Padding="12,12" Margin="-12,0"
+                                            Command="{Binding DataContext.SignInWithCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="Icon" Width="40" Height="40" CornerRadius="20" Background="{StaticResource ElevatedHover}"
+                                                    VerticalAlignment="Top" Margin="0,0,16,0">
+                                                <TextBlock x:Name="IconGlyph" Text="{Binding Glyph}" Style="{StaticResource Glyph}" FontSize="17"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="15"/>
+                                                    <Border CornerRadius="9" Padding="8,2" Margin="10,0,0,0" Background="#33FF4E6B" VerticalAlignment="Center"
+                                                            Visibility="{Binding Badge, Converter={StaticResource Vis}}">
+                                                        <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Accent}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Sub}" FontSize="13" TextWrapping="Wrap"
+                                                           TextTrimming="None" Margin="0,3,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="&#xE76C;" Style="{StaticResource Glyph}" FontSize="12"
+                                                       Foreground="{StaticResource TextDim}" Margin="16,0,0,0"/>
+                                        </Grid>
+                                    </Button>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Badge, Converter={StaticResource Vis}}" Value="Visible">
+                                            <Setter TargetName="Icon" Property="Background" Value="{StaticResource Accent}"/>
+                                            <Setter TargetName="IconGlyph" Property="Foreground" Value="White"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <!-- Waiting for the browser -->
-                        <Border Margin="70,20,0,0" Padding="16,12" CornerRadius="8" Background="#14FFFFFF" HorizontalAlignment="Left"
+                        <Border Margin="0,8,0,8" Padding="16,12" CornerRadius="8" Background="#14FFFFFF"
                                 Visibility="{Binding IsWaitingForBrowser, Converter={StaticResource BoolVis}}">
                             <DockPanel>
                                 <Button DockPanel.Dock="Right" Style="{StaticResource OutlinePill}" Content="Cancel" Margin="20,0,0,0"
                                         VerticalAlignment="Center" Command="{Binding CancelBrowserSignInCommand}"/>
                                 <Ellipse Width="10" Height="10" Fill="{StaticResource Accent}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Waiting for you to sign in in Firefox…" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Finish signing in there; this window updates by itself." Style="{StaticResource Sub}" FontSize="12" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding WaitingBrowserName, StringFormat='Waiting for you to sign in in {0}…'}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Finish signing in there; this page updates by itself." Style="{StaticResource Sub}" FontSize="12" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </DockPanel>
                         </Border>
                     </StackPanel>
                 </Border>
-
-                <Button Style="{StaticResource IconButton}" Width="Auto" Height="Auto" HorizontalAlignment="Left" Margin="0,20,0,0" Padding="0"
-                        FontFamily="{StaticResource Body}" FontSize="13" Command="{Binding ToggleManualCommand}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Other ways to sign in (cookie / cookies.txt)" TextDecorations="Underline"/>
-                        <TextBlock Text="{Binding ShowManual, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE70E;|&#xE70D;}"
-                                   FontFamily="{StaticResource Icons}" FontSize="10" Margin="8,2,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
 
                 <Border Background="{StaticResource Elevated}" CornerRadius="8" Padding="24,20" Margin="0,16,0,0"
                         Visibility="{Binding ShowManual, Converter={StaticResource BoolVis}}">
@@ -186,6 +189,46 @@
                             <StackPanel Margin="0,0,24,0">
                                 <TextBlock Text="Keep playing in the tray when closed" FontWeight="SemiBold" FontSize="14"/>
                                 <TextBlock Text="The close button hides the app to the notification area instead of quitting."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding StartWithWindows}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Start with Windows" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Opens when you sign in to Windows, the way you left it: the full window, the mini player, or just the tray icon."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding ResumePlaybackOnStart}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Continue playing on startup" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="If music was playing when the app closed, it carries on with the same song, position and queue."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding Playback.Autoplay}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Autoplay similar songs" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="When your queue runs out, keeps going with songs like the last one."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource OutlinePill}" Content="Clear cache" VerticalAlignment="Center"
+                                    Padding="14,6" Command="{Binding ClearCacheCommand}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Cached library" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="A copy of your YouTube playlists kept on this PC, so they stay playable when you're signed out or offline (tagged Cached). Local playlists aren't affected."
                                            Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
                             </StackPanel>
                         </DockPanel>

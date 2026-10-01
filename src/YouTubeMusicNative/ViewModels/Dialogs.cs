@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using YouTubeMusicNative.Api;
+using YouTubeMusicNative.Services;
 
 namespace YouTubeMusicNative.ViewModels;
 
@@ -38,9 +39,9 @@ public abstract partial class DialogViewModel(Action close) : ObservableObject
     }
 }
 
-/// <summary>"Add to playlist": the user's editable playlists, plus "New playlist".</summary>
+/// <summary>"Add to playlist": the user's editable YouTube playlists (when signed in) and the local ones, plus "New playlist".</summary>
 public sealed partial class AddToPlaylistDialog(
-    InnerTubeClient api, Track track, Action close, Action<Track> newPlaylist, Action<string> added)
+    InnerTubeClient api, LocalLibrary local, Track track, Action close, Action<Track> newPlaylist, Action<string, PlaylistOption, bool> added)
     : DialogViewModel(close)
 {
     public Track Track { get; } = track;
@@ -48,22 +49,38 @@ public sealed partial class AddToPlaylistDialog(
 
     [ObservableProperty] private bool _isEmpty;
 
-    public async Task LoadAsync() => await TryAsync(async () =>
+    public async Task LoadAsync()
     {
-        var lists = await api.GetEditablePlaylistsAsync(Track.VideoId);
-        // Liked Music is handled by the heart; Episodes for Later is for podcasts.
-        foreach (var p in lists.Where(p => p.PlaylistId is not ("LM" or "SE"))) Playlists.Add(p);
+        if (api.IsLoggedIn)
+        {
+            await TryAsync(async () =>
+            {
+                var lists = await api.GetEditablePlaylistsAsync(Track.VideoId);
+                // Liked Music is handled by the heart; Episodes for Later is for podcasts.
+                foreach (var p in lists.Where(p => p.PlaylistId is not ("LM" or "SE"))) Playlists.Add(p);
+            });
+        }
+        foreach (var p in local.Playlists)
+            Playlists.Add(new PlaylistOption(p.Id, p.Title, p.Tracks.Count == 1 ? "1 song" : $"{p.Tracks.Count} songs",
+                p.Tracks.FirstOrDefault()?.ThumbnailUrl) { IsLocal = true });
         IsEmpty = Playlists.Count == 0;
-    });
+    }
 
     [RelayCommand]
     private async Task AddAsync(PlaylistOption? playlist)
     {
         if (playlist is null) return;
+        if (playlist.IsLocal)
+        {
+            bool isNew = local.Add(playlist.PlaylistId, Track);
+            added(isNew ? $"Added to {playlist.Title}" : $"Already in {playlist.Title}", playlist, isNew);
+            Close();
+            return;
+        }
         bool wasAdded = false;
         if (await TryAsync(async () => wasAdded = await api.AddToPlaylistAsync(playlist.PlaylistId, Track.VideoId)))
         {
-            added(wasAdded ? $"Added to {playlist.Title}" : $"Already in {playlist.Title}");
+            added(wasAdded ? $"Added to {playlist.Title}" : $"Already in {playlist.Title}", playlist, wasAdded);
             Close();
         }
     }
@@ -72,12 +89,24 @@ public sealed partial class AddToPlaylistDialog(
     private void NewPlaylist() => newPlaylist(Track);
 }
 
-/// <summary>"New playlist": title, description, privacy; optionally starts with a song.</summary>
+/// <summary>
+/// "New playlist": where (on this PC or on YouTube Music, when signed in), title, description, privacy;
+/// optionally starts with a song. <c>created(id, title, isLocal)</c>.
+/// </summary>
 public sealed partial class CreatePlaylistDialog(
-    InnerTubeClient api, Track? firstSong, Action close, Action<string, string> created)
+    InnerTubeClient api, LocalLibrary local, Track? firstSong, Action close, Action<string, string, bool> created)
     : DialogViewModel(close)
 {
     public Track? FirstSong { get; } = firstSong;
+
+    /// <summary>Signed out, playlists can only be local, so the choice isn't shown.</summary>
+    public bool CanChooseDestination { get; } = api.IsLoggedIn;
+
+    [ObservableProperty] private bool _isLocal = !api.IsLoggedIn;
+
+    [RelayCommand]
+    private void SetDestination(string where) => IsLocal = where == "Local" || !api.IsLoggedIn;
+
     public IReadOnlyList<PlaylistPrivacy> PrivacyOptions { get; } = Enum.GetValues<PlaylistPrivacy>();
 
     [ObservableProperty]
@@ -97,11 +126,18 @@ public sealed partial class CreatePlaylistDialog(
     {
         string id = "";
         var title = Title.Trim();
+        if (IsLocal)
+        {
+            id = local.Create(title, Description.Trim(), FirstSong).Id;
+            Close();
+            created(id, title, true);
+            return;
+        }
         if (await TryAsync(async () => id = await api.CreatePlaylistAsync(
                 title, Description.Trim(), Privacy, FirstSong is null ? null : [FirstSong.VideoId])))
         {
             Close();
-            created(id, title);
+            created(id, title, false);
         }
     }
 }
