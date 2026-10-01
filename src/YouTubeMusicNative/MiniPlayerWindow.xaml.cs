@@ -302,37 +302,44 @@ public partial class MiniPlayerWindow : Window
             _drawerHideTimer.Stop();
             _drawerShowTimer.Stop();
             if (_drawerOpen) SetDrawer(false, animate: false);
-            // Remember the player's size and place (unless it's still sliding out towards them).
-            if (_slide is null)
-            {
-                _fullHeight = Height;
-                _fullTop = Top;
-            }
+            CompleteSlide();
+            _fullHeight = Height;
+            _fullTop = Top;
             _tucked = true;
         }
-        // Shrink into a square handle centred on where the player was, sliding off the edge at the same time,
-        // while the handle fades in over it.
-        double top = Math.Clamp(_fullTop + (_fullHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
-        ShowTab(true);
-        MoveTo(target, top, TabHeight, tabOpacity: 1, animate);
+        // Slide off the edge at full size, then shrink to a square handle centred on where the player was.
+        double tabTop = Math.Clamp(_fullTop + (_fullHeight - TabHeight) / 2, area.Top, area.Bottom - TabHeight);
+        SlideTo(target, animate ? 200 : 0, Motion.EaseOut, done: () =>
+        {
+            if (!_tucked) return;
+            Height = TabHeight;
+            Top = tabTop;
+            ShowTab(true);
+        });
     }
 
     private void Reveal()
     {
         var area = WorkArea();
         double target = _dock == Dock.Right ? area.Right - Width : area.Left;
+        CompleteSlide();
         _tucked = false;
-        // Grow out of the handle and slide in together (no jump to full height first); the handle fades away.
-        double top = Math.Clamp(_fullTop, area.Top, Math.Max(area.Top, area.Bottom - _fullHeight));
-        MoveTo(target, top, _fullHeight, tabOpacity: 0, animate: true, done: () => ShowTab(false));
+        // Back to full size right at the edge, then slide out with a little spring at the end.
+        ShowTab(false);
+        Height = _fullHeight;
+        Top = Math.Clamp(_fullTop, area.Top, Math.Max(area.Top, area.Bottom - _fullHeight));
+        SlideTo(target, 340, Spring);
         if (_panel.IsExpanded && !_drawerOpen) _drawerShowTimer.Start();
     }
 
-    private void ShowTab(bool show)
+    /// <summary>Ease-out that overshoots slightly and settles back (a small bounce).</summary>
+    private static double Spring(double p)
     {
-        Tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        if (!show) Tab.Opacity = 1;
+        const double c = 1.35;
+        return 1 + (c + 1) * Math.Pow(p - 1, 3) + c * Math.Pow(p - 1, 2);
     }
+
+    private void ShowTab(bool show) => Tab.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Peek out for a moment when the song changes while tucked away.</summary>
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
@@ -351,41 +358,29 @@ public partial class MiniPlayerWindow : Window
         _hideTimer.Interval = TimeSpan.FromMilliseconds(650);
     }
 
-    /// <summary>
-    /// Eased move + resize of the whole window (tuck / reveal), one window move per frame, with the edge handle
-    /// cross-fading to <paramref name="tabOpacity"/>.
-    /// </summary>
-    private void MoveTo(double left, double top, double height, double tabOpacity, bool animate, Action? done = null)
+    /// <summary>Horizontal slide of the window (tuck / reveal), one move per rendered frame.</summary>
+    private void SlideTo(double target, double ms, Func<double, double> easing, Action? done = null)
     {
         StopTween(ref _slide);
         _finishSlide = null;
         void Finish()
         {
-            Left = left;
-            Top = top;
-            Height = height;
-            Tab.Opacity = tabOpacity;
+            Left = target;
             done?.Invoke();
         }
-        var from = CurrentBounds();
-        if (!animate || from is null)
+        double from = CurrentBounds()?.Left ?? Left;
+        if (ms <= 0 || Math.Abs(from - target) < 1)
         {
             Finish();
             return;
         }
-        var (fromL, fromT, fromH) = from.Value;
-        double fromTab = Tab.Visibility == Visibility.Visible ? Tab.Opacity : 1 - tabOpacity;
         _finishSlide = () =>
         {
             StopTween(ref _slide);
             _finishSlide = null;
             Finish();
         };
-        _slide = Tween(Motion.Duration(200), eased =>
-        {
-            SetBounds(fromL + (left - fromL) * eased, fromT + (top - fromT) * eased, fromH + (height - fromH) * eased);
-            Tab.Opacity = fromTab + (tabOpacity - fromTab) * eased;
-        }, () =>
+        _slide = Tween(ms, easing, eased => Left = from + (target - from) * eased, () =>
         {
             _slide = null;
             _finishSlide = null;
@@ -409,14 +404,14 @@ public partial class MiniPlayerWindow : Window
     /// Calls <paramref name="step"/> once per rendered frame, in step with the display, with eased progress 0..1.
     /// Returns the frame handler so the tween can be stopped.
     /// </summary>
-    private static EventHandler Tween(double ms, Action<double> step, Action done)
+    private static EventHandler Tween(double ms, Func<double, double> easing, Action<double> step, Action done)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         EventHandler? frame = null;
         frame = (_, _) =>
         {
             double p = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
-            step(Motion.EaseOut(p));
+            step(easing(p));
             if (p < 1) return;
             CompositionTarget.Rendering -= frame;
             done();
@@ -487,7 +482,7 @@ public partial class MiniPlayerWindow : Window
             return;
         }
         var (fromL, fromT, fromH) = CurrentBounds() ?? (Left, Top, Height);
-        _resize = Tween(Motion.Duration(220),
+        _resize = Tween(Motion.Duration(220), Motion.EaseOut,
             eased => SetBounds(fromL, fromT + (top - fromT) * eased, fromH + (height - fromH) * eased),
             () =>
             {
