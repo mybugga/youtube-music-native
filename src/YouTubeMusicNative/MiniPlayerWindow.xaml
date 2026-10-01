@@ -177,6 +177,43 @@
                                       Command="{Binding CycleRepeatCommand}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Volume: the speaker mutes / unmutes; hovering slides out a slider; the wheel nudges it. -->
+                    <StackPanel Orientation="Horizontal" Background="Transparent" MouseWheel="OnVolumeWheel">
+                        <StackPanel.Triggers>
+                            <EventTrigger RoutedEvent="MouseEnter">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="VolumeTrack" Storyboard.TargetProperty="Width" To="60" Duration="0:0:0.28">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="VolumeTrack" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                            <EventTrigger RoutedEvent="MouseLeave">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="VolumeTrack" Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.3"
+                                                         BeginTime="0:0:0.35">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="VolumeTrack" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"
+                                                         BeginTime="0:0:0.35"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </StackPanel.Triggers>
+                        <Border x:Name="VolumeTrack" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
+                            <Slider Style="{StaticResource ThinSlider}" Width="56" Minimum="0" Maximum="100" HorizontalAlignment="Left"
+                                    Value="{Binding Playback.Volume}" SmallChange="5" LargeChange="10" Margin="0,0,4,0"/>
+                        </Border>
+                        <Button Style="{StaticResource IconButton}" FontSize="15" Click="OnMuteClick"
+                                Content="{Binding Playback.Volume, Converter={StaticResource VolumeGlyph}}">
+                            <Button.ToolTip>
+                                <TextBlock Text="{Binding Playback.Volume, StringFormat='Volume {0:0}% (click to mute, scroll to change)'}"/>
+                            </Button.ToolTip>
+                        </Button>
+                    </StackPanel>
                     <Button Style="{StaticResource IconButton}" FontSize="15"
                             Command="{Binding Actions.ToggleLikeCommand}" CommandParameter="{Binding Playback.NowPlaying}">
                         <Button.Content>

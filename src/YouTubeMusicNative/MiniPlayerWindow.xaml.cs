@@ -605,6 +605,29 @@ public partial class MiniPlayerWindow : Window
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();
 
+    private double _volumeBeforeMute = 70;
+
+    private void OnMuteClick(object sender, RoutedEventArgs e)
+    {
+        var playback = _vm.Playback;
+        if (playback.Volume > 0)
+        {
+            _volumeBeforeMute = playback.Volume;
+            playback.Volume = 0;
+        }
+        else
+        {
+            playback.Volume = _volumeBeforeMute;
+        }
+    }
+
+    /// <summary>Wheel over the speaker / slider: 5% a notch.</summary>
+    private void OnVolumeWheel(object sender, MouseWheelEventArgs e)
+    {
+        e.Handled = true;
+        _vm.Playback.Volume = Math.Clamp(Math.Round(_vm.Playback.Volume / 5) * 5 + Math.Sign(e.Delta) * 5, 0, 100);
+    }
+
     // ---- interop ----------------------------------------------------------------------------
 
     private const uint MonitorDefaultToNearest = 2;
