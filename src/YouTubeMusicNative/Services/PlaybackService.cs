@@ -76,8 +76,7 @@ public sealed partial class PlaybackService : ObservableObject, IDisposable
         _sessionTimer.Tick += (_, _) => { if (!IsPaused) SaveSession(); };
         _sessionTimer.Start();
 
-        var deps = AppContext.BaseDirectory;
-        _mpv = new MpvPlayer(Path.Combine(deps, "yt-dlp.exe"));
+        _mpv = new MpvPlayer(UpdateService.YtdlpPath(store));
         RefreshYtdlOptions();
 
         _mpv.PositionChanged += pos =>

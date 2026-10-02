@@ -28,8 +28,12 @@ easily takes 500 MB–1 GB of RAM. This app plays the same music in a fraction o
 Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 [latest release](https://github.com/mybugga/youtube-music-native/releases/latest) and run it.
 
-- It installs for your user only (no admin prompt) into `%LocalAppData%\Programs\YouTubeMusicNative`, adds a
-  Start menu entry (and optionally a desktop icon), and can be uninstalled from *Settings → Apps*.
+- The first page asks who it's for:
+  - **Only for me** (the default, no admin prompt) installs into `%LocalAppData%\Programs\YouTubeMusicNative`.
+  - **All users** installs into `Program Files` for everyone on the PC. It asks for admin rights, and so do its
+    updates.
+- Either way it adds a Start menu entry (and optionally a desktop icon), and can be uninstalled from
+  *Settings → Apps*. Settings and sign-in stay separate for each Windows user.
 - Nothing else is needed: the .NET runtime, libmpv, yt-dlp and Deno are all included.
 - **Updates itself.** The app checks GitHub for new releases every few hours, downloads them in the
   background and installs them quietly the next time it closes or starts. When one is ready, an

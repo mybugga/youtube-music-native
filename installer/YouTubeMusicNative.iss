@@ -1,6 +1,7 @@
 ; YouTube Music Native installer (Inno Setup 6).
 ; Build:  ISCC installer\YouTubeMusicNative.iss /DAppVersion=1.2.3 /DSourceDir=<publish folder> /O<output folder>
-; Per-user install (no admin prompt), so the app can update itself silently from GitHub releases.
+; Installs for the current user (default, no admin prompt) or, picked on the first page, for all users in Program
+; Files (asks for admin rights; the app's own updates then ask for them too). Updates keep the mode used before.
 
 #ifndef AppVersion
   #define AppVersion "1.0.0"
@@ -24,12 +25,15 @@ AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
 AppUpdatesURL={#AppUrl}/releases
 VersionInfoVersion={#AppVersion}
-DefaultDirName={localappdata}\Programs\{#AppKey}
+; {autopf} is %LocalAppData%\Programs for a per-user install (same folder as before) and Program Files for all users.
+DefaultDirName={autopf}\{#AppKey}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 DisableReadyPage=yes
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog commandline
+UsePreviousPrivileges=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041

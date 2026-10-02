@@ -69,6 +69,52 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
     /// <summary>Installed through the setup (it leaves an uninstaller next to the exe); a dev build never self-updates.</summary>
     public static bool IsInstalled => File.Exists(Path.Combine(AppContext.BaseDirectory, "unins000.exe"));
 
+    /// <summary>
+    /// The install folder can't be written without admin rights (installed for all users, in Program Files):
+    /// updates then go through an elevated installer, and yt-dlp is run from a copy in the user's data folder.
+    /// </summary>
+    public static bool IsReadOnlyInstall => ReadOnlyInstall.Value;
+
+    private static readonly Lazy<bool> ReadOnlyInstall = new(() =>
+    {
+        try
+        {
+            var probe = Path.Combine(AppContext.BaseDirectory, ".write-test-" + Environment.ProcessId);
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    });
+
+    /// <summary>
+    /// The yt-dlp to run: the bundled one, or for a read-only install a copy in the data folder that "yt-dlp -U"
+    /// can update (refreshed from the bundled one when an app update brings a newer build).
+    /// </summary>
+    public static string YtdlpPath(SettingsStore store)
+    {
+        var bundled = Path.Combine(AppContext.BaseDirectory, "yt-dlp.exe");
+        if (!IsReadOnlyInstall || !File.Exists(bundled)) return bundled;
+        var own = Path.Combine(store.Directory, "yt-dlp", "yt-dlp.exe");
+        try
+        {
+            if (!File.Exists(own) || File.GetLastWriteTimeUtc(bundled) > File.GetLastWriteTimeUtc(own))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(own)!);
+                File.Copy(bundled, own, overwrite: true);
+            }
+            return own;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Write("couldn't copy yt-dlp to the data folder: " + ex.Message);
+            return bundled;
+        }
+    }
+
     [ObservableProperty] private bool _isChecking;
     [ObservableProperty] private string? _status;
 
@@ -278,7 +324,9 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
 
     private static void Launch(string installer, bool relaunch)
     {
-        var args = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS" + (relaunch ? " /RELAUNCH=1" : "");
+        // Same install mode as now: an all-users copy updates in Program Files (Windows asks for admin rights).
+        var args = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS"
+                   + (IsReadOnlyInstall ? " /ALLUSERS" : " /CURRENTUSER") + (relaunch ? " /RELAUNCH=1" : "");
         Process.Start(new ProcessStartInfo(installer, args) { UseShellExecute = false });
     }
 
@@ -326,7 +374,7 @@ public sealed partial class UpdateService : ObservableObject, IDisposable
     /// <summary>"yt-dlp -U" about once a day: streams stop resolving when YouTube changes and yt-dlp hasn't caught up.</summary>
     private async Task UpdateYtdlpAsync()
     {
-        var exe = Path.Combine(AppContext.BaseDirectory, "yt-dlp.exe");
+        var exe = YtdlpPath(_store);
         if (!File.Exists(exe) || DateTime.UtcNow - _store.Settings.LastYtdlpUpdate < YtdlpInterval) return;
         _store.Settings.LastYtdlpUpdate = DateTime.UtcNow;
         _store.Save();
