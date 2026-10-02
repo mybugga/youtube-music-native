@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>YouTube Music Native</title>
+  <style>
+    rect { fill: #C4010B; transform-box: fill-box; transform-origin: 50% 100%; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    .a { animation-name: a; animation-duration: 2.3s; }
+    .b { animation-name: b; animation-duration: 1.9s; }
+    .c { animation-name: c; animation-duration: 2.7s; }
+    @keyframes a { 0%,100% { transform: scaleY(1) } 12% { transform: scaleY(.55) } 27% { transform: scaleY(.9) } 41% { transform: scaleY(.4) } 58% { transform: scaleY(.8) } 74% { transform: scaleY(.5) } 88% { transform: scaleY(.95) } }
+    @keyframes b { 0%,100% { transform: scaleY(1) } 15% { transform: scaleY(.45) } 31% { transform: scaleY(.85) } 47% { transform: scaleY(.6) } 63% { transform: scaleY(1) } 79% { transform: scaleY(.38) } 91% { transform: scaleY(.75) } }
+    @keyframes c { 0%,100% { transform: scaleY(1) } 10% { transform: scaleY(.7) } 24% { transform: scaleY(.42) } 39% { transform: scaleY(.88) } 55% { transform: scaleY(.5) } 70% { transform: scaleY(.78) } 85% { transform: scaleY(.36) } }
+    @media (prefers-reduced-motion: reduce) { rect { animation: none; } }
+  </style>
+  <!-- Same bars as Assets/logo.png and the app's live title-bar logo -->
+  <rect class="a" x="21" y="97" width="66" height="97" rx="33"/>
+  <rect class="b" x="95" y="57" width="66" height="158" rx="33"/>
+  <rect class="c" x="170" y="10" width="65" height="236" rx="32.5"/>
+</svg>
