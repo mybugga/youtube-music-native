@@ -33,7 +33,8 @@ DisableDirPage=auto
 DisableReadyPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog commandline
-UsePreviousPrivileges=yes
+; Always ask when run by hand (even over an existing install); the app's own updates pass /CURRENTUSER or /ALLUSERS.
+UsePreviousPrivileges=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
