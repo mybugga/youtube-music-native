@@ -223,6 +223,16 @@
                             </StackPanel>
                         </DockPanel>
                         <Border Height="1" Background="#1AFFFFFF"/>
+                        <DockPanel Margin="0,14">
+                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                          IsChecked="{Binding MiniPeekOnSongChange}"/>
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="Show new songs from the hidden mini player" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="When the mini player is tucked away at the screen edge, it slides out for a moment each time the song changes."
+                                           Style="{StaticResource Sub}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Height="1" Background="#1AFFFFFF"/>
                         <!-- Performance: one choice of three (Less memory is the default) -->
                         <DockPanel Margin="0,14">
                             <Border DockPanel.Dock="Right" VerticalAlignment="Center" Background="#2A2A2A" CornerRadius="17" Padding="3">

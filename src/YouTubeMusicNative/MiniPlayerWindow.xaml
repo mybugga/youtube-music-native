@@ -282,7 +282,8 @@
                 <ListBox Style="{StaticResource TrackList}" Margin="4,0,4,4"
                          ItemsSource="{Binding Queue.Items}" ItemTemplate="{StaticResource QueueRow}"
                          ItemContainerStyleSelector="{x:Null}" ItemContainerStyle="{StaticResource TrackItem}"
-                         v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"/>
+                         v:ListBehaviors.ActivateCommand="{Binding PlayCommand}"
+                         v:ListBehaviors.FollowItem="{Binding Queue.Current}"/>
                 <TextBlock Style="{StaticResource Sub}" TextAlignment="Center" Margin="24,36" VerticalAlignment="Top"
                            Text="Your queue is empty."
                            Visibility="{Binding Queue.Items.Count, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
@@ -432,10 +433,11 @@
             </Grid>
         </Grid>
 
-        <!-- Handle shown while tucked against a screen edge: the window shrinks to this square and only it is on
-             screen. Just the cover, with a thin progress line; dimmed with a play mark while paused. Hover to slide out. -->
+        <!-- Handle shown while tucked against a screen edge (moved into its own small window in code): the cover, with a
+             thin progress line, dimmed with a play mark while paused. Hovering shows play / pause (a click anywhere on it);
+             dragging it pulls the player back out. -->
         <Grid x:Name="Tab" Grid.RowSpan="2" Width="52" Height="52" VerticalAlignment="Center" HorizontalAlignment="Left" Visibility="Collapsed" Cursor="Hand"
-              Background="{StaticResource Elevated}" ToolTip="{Binding Playback.NowPlaying.Title}">
+              Background="{StaticResource Elevated}">
             <TextBlock Text="&#xE8D6;" Style="{StaticResource Glyph}" FontSize="16" Foreground="{StaticResource TextFaint}"/>
             <Rectangle>
                 <Rectangle.Fill>
@@ -447,6 +449,11 @@
             </Border>
             <Border Background="#8C000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
                 <v:Spinner Width="20" Height="20" Thickness="2"/>
+            </Border>
+            <!-- hover: play / pause -->
+            <Border Background="#B3000000" Opacity="0" v:Motion.Show="{Binding IsMouseOver, ElementName=Tab}">
+                <TextBlock Style="{StaticResource Glyph}" FontSize="16" Foreground="White"
+                           Text="{Binding Playback.IsPaused, Converter={StaticResource BoolGlyph}, ConverterParameter=&#xE768;|&#xE769;}"/>
             </Border>
             <!-- progress -->
             <Rectangle Height="3" VerticalAlignment="Bottom" Fill="#59000000"/>

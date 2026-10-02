@@ -97,6 +97,18 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>The mini player, hidden at a screen edge, slides out briefly when the song changes.</summary>
+    public bool MiniPeekOnSongChange
+    {
+        get => _store.Settings.MiniPeekOnSongChange;
+        set
+        {
+            _store.Settings.MiniPeekOnSongChange = value;
+            _store.Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Closing the window keeps playing from the tray (settings, on the account page).</summary>
     public bool CloseToTray
     {

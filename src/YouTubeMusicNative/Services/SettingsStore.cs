@@ -39,6 +39,8 @@ public sealed class AppSettings
     /// <summary>Mini player drawer (up next / search / library) open, and which tab.</summary>
     public bool MiniExpanded { get; set; }
     public string? MiniTab { get; set; }
+    /// <summary>Mini player tucked at a screen edge: slide out for a moment to show each new song.</summary>
+    public bool MiniPeekOnSongChange { get; set; }
     /// <summary>Look for new versions on GitHub, and install them quietly when the app closes.</summary>
     public bool CheckForUpdates { get; set; } = true;
     public bool InstallUpdatesOnExit { get; set; } = true;

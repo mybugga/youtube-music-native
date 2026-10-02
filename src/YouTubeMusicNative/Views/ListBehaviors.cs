@@ -13,6 +13,7 @@ namespace YouTubeMusicNative.Views;
 ///  OpenMenuOnClick    – a button that opens its own ContextMenu on left click ("…" more buttons).
 ///  BubbleWheel        – a horizontal-only scroller passes vertical wheel input to the page behind it.
 ///  ScrollTarget       – a button that pages the named element's ScrollViewer left (-1) or right (+1).
+///  FollowItem         – keeps the bound item (the playing song) scrolled to the top of the list.
 /// </summary>
 public static class ListBehaviors
 {
@@ -170,6 +171,53 @@ public static class ListBehaviors
     private static void Execute(ICommand? command, object? parameter)
     {
         if (command?.CanExecute(parameter) == true) command.Execute(parameter);
+    }
+
+    // ---- FollowItem ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Keeps the bound item (the playing song) at the top of the list: glides there when it changes,
+    /// and jumps there whenever the list is shown again.
+    /// </summary>
+    public static readonly DependencyProperty FollowItemProperty = DependencyProperty.RegisterAttached(
+        "FollowItem", typeof(object), typeof(ListBehaviors), new PropertyMetadata(null, OnFollowItemChanged));
+
+    public static object? GetFollowItem(DependencyObject d) => d.GetValue(FollowItemProperty);
+    public static void SetFollowItem(DependencyObject d, object? value) => d.SetValue(FollowItemProperty, value);
+
+    private static void OnFollowItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not ListBox list) return;
+        list.IsVisibleChanged -= OnFollowListVisibleChanged;
+        list.IsVisibleChanged += OnFollowListVisibleChanged;
+        BringToTop(list, animate: true);
+    }
+
+    private static void OnFollowListVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true) BringToTop((ListBox)sender, animate: false);
+    }
+
+    private static void BringToTop(ListBox list, bool animate)
+    {
+        if (!list.IsVisible || GetFollowItem(list) is not { } item) return;
+        // After layout, so a just-shown list or a just-changed queue has its rows in place.
+        list.Dispatcher.BeginInvoke(() =>
+        {
+            if (!list.IsVisible || !ReferenceEquals(GetFollowItem(list), item) || FindChild<ScrollViewer>(list) is not { } viewer) return;
+            if (list.ItemContainerGenerator.ContainerFromItem(item) is not FrameworkElement row)
+            {
+                // Far away (not built yet by the virtualizing list): jump near it first, then line it up.
+                list.ScrollIntoView(item);
+                list.UpdateLayout();
+                if (list.ItemContainerGenerator.ContainerFromItem(item) is not FrameworkElement built) return;
+                row = built;
+                animate = false;
+            }
+            double top = viewer.VerticalOffset + row.TransformToAncestor(viewer).Transform(new Point()).Y;
+            if (animate) Motion.GlideVerticallyTo(viewer, top);
+            else viewer.ScrollToVerticalOffset(Math.Clamp(top, 0, viewer.ScrollableHeight));
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     public static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject

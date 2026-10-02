@@ -56,8 +56,9 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 - **Move playlists around**: copy a YouTube Music playlist or album to this PC, upload a local playlist to your
   YouTube Music account, or export any playlist to a `.json` file and import it again (on this PC or to YouTube)
 - **Mini player**: compact, always on top, with play / pause on the cover plus shuffle and repeat. It has a drawer
-  for Up next, Search and Library that hides itself when you move away. Drag it to a screen edge and it tucks
-  away to a small cover tab.
+  for Up next, Search and Library that hides itself when you move away, and keeps the playing song at the top of
+  Up next. Drag it to a screen edge and it tucks away to a small cover tab: click the tab to play / pause, drag it
+  to bring the player back out.
 - **Performance** setting with three choices:
   - *Less memory* draws with the processor and saves about 40 MB.
   - *Standard* draws with the graphics card.
@@ -75,7 +76,7 @@ Download **`YouTubeMusicNative-<version>-setup.exe`** from the
 
 ### Signing in
 
-Click the avatar in the title bar and pick a way to sign in:
+Click the settings (gear) button in the title bar and pick a way to sign in:
 
 - **Sign in with your browser** (Firefox, LibreWolf, Waterfox, Floorp, Zen). Google sign-in opens there, and the app
   picks up the session by itself as soon as you're signed in. It refreshes the session on every start.

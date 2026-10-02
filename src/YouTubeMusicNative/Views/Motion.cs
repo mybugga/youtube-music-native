@@ -408,11 +408,12 @@ public static class Motion
         if (Scrolling.Count == 0) CompositionTarget.Rendering -= OnFrame;
     }
 
-    // ---- eased sideways scrolling (shelf arrows) ----------------------------------------------
+    // ---- eased sideways scrolling (shelf arrows) and jumps to an item -------------------------
 
     private sealed class Glide
     {
         public double From, Target;
+        public bool Vertical;
         public TimeSpan Start = TimeSpan.MinValue;
     }
 
@@ -427,11 +428,35 @@ public static class Motion
     public static void GlideHorizontally(ScrollViewer viewer, double delta)
     {
         var glide = Glides.GetOrCreateValue(viewer);
-        double baseTarget = Gliding.Contains(viewer) ? glide.Target : viewer.HorizontalOffset;
-        glide.From = viewer.HorizontalOffset;
-        glide.Target = Math.Clamp(baseTarget + delta, 0, viewer.ScrollableWidth);
+        double baseTarget = Gliding.Contains(viewer) && !glide.Vertical ? glide.Target : viewer.HorizontalOffset;
+        StartGlide(viewer, glide, vertical: false, viewer.HorizontalOffset, Math.Clamp(baseTarget + delta, 0, viewer.ScrollableWidth));
+    }
+
+    /// <summary>Scrolls a list up or down to <paramref name="offset"/>: an eased glide with Smooth animations, else a jump.</summary>
+    public static void GlideVerticallyTo(ScrollViewer viewer, double offset)
+    {
+        offset = Math.Clamp(offset, 0, viewer.ScrollableHeight);
+        var glide = Glides.GetOrCreateValue(viewer);
+        if (!Enabled)
+        {
+            Gliding.Remove(viewer);
+            viewer.ScrollToVerticalOffset(offset);
+            return;
+        }
+        StartGlide(viewer, glide, vertical: true, viewer.VerticalOffset, offset);
+    }
+
+    private static void StartGlide(ScrollViewer viewer, Glide glide, bool vertical, double from, double target)
+    {
+        glide.Vertical = vertical;
+        glide.From = from;
+        glide.Target = target;
         glide.Start = TimeSpan.MinValue; // set on the next frame
-        if (Math.Abs(glide.Target - glide.From) < 0.5) return;
+        if (Math.Abs(glide.Target - glide.From) < 0.5)
+        {
+            Gliding.Remove(viewer);
+            return;
+        }
         if (Gliding.Add(viewer) && Gliding.Count == 1) CompositionTarget.Rendering += OnGlideFrame;
     }
 
@@ -444,7 +469,9 @@ public static class Motion
             if (glide.Start == TimeSpan.MinValue) glide.Start = now;
             double p = Math.Clamp((now - glide.Start).TotalMilliseconds / GlideMs, 0, 1);
             double eased = 1 - Math.Pow(1 - p, 4);
-            viewer.ScrollToHorizontalOffset(glide.From + (glide.Target - glide.From) * eased);
+            double offset = glide.From + (glide.Target - glide.From) * eased;
+            if (glide.Vertical) viewer.ScrollToVerticalOffset(offset);
+            else viewer.ScrollToHorizontalOffset(offset);
             if (p >= 1 || !viewer.IsLoaded) Gliding.Remove(viewer);
         }
         if (Gliding.Count == 0) CompositionTarget.Rendering -= OnGlideFrame;

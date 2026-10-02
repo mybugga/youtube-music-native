@@ -32,7 +32,7 @@ public partial class MiniPlayerWindow : Window
     private readonly MainViewModel _vm;
     private readonly SeekBar _seekBar;
     private readonly DispatcherTimer _hideTimer;
-    private readonly DispatcherTimer _revealTimer;
+    private Point? _tabPressedAt;  // where the left button went down on the tab (screen px), until it's released or dragged
     private readonly DispatcherTimer _drawerHideTimer;  // auto-hide the drawer ~2 s after the pointer leaves
     private readonly DispatcherTimer _drawerShowTimer;  // ...and bring it back shortly after it returns
     private EventHandler? _resize;
@@ -192,13 +192,6 @@ public partial class MiniPlayerWindow : Window
 
         // Buttons and the seek bar handle their own clicks, so this only fires on empty space (and the tab).
         MouseLeftButtonDown += OnDragStart;
-        // A short hover delay so brushing past the screen edge doesn't pop the player out.
-        _revealTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(160) };
-        _revealTimer.Tick += (_, _) =>
-        {
-            _revealTimer.Stop();
-            if (_dock != Dock.None && _tucked && _tabWindow!.IsMouseOver) Reveal();
-        };
         MouseEnter += (_, _) =>
         {
             _hideTimer.Stop();
@@ -233,7 +226,6 @@ public partial class MiniPlayerWindow : Window
             vm.PropertyChanged -= OnMainChanged;
             vm.Playback.PropertyChanged -= OnPlaybackChanged;
             _hideTimer.Stop();
-            _revealTimer.Stop();
             _drawerHideTimer.Stop();
             _drawerShowTimer.Stop();
             StopTween(ref _slide);
@@ -254,21 +246,51 @@ public partial class MiniPlayerWindow : Window
         if (e.ButtonState != MouseButtonState.Pressed) return;
         CompleteSlide();
         _hideTimer.Stop();
-        _revealTimer.Stop();
 
         DragMove(); // returns when the mouse is released
         AfterDrag();
     }
 
-    /// <summary>Grabbing the tab: the full player comes back right under the pointer (cover centred on it) to be dragged.</summary>
+    // The tab: a click plays / pauses; dragging it pulls the player back out (to move it, or drop it on the edge again).
     private void OnTabMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
         e.Handled = true;
+        _tabPressedAt = _tabWindow!.PointToScreen(e.GetPosition(_tabWindow));
+        _tabWindow.CaptureMouse();
+    }
+
+    private void OnTabMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_tabPressedAt is not { } start) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _tabPressedAt = null;
+            return;
+        }
+        var now = _tabWindow!.PointToScreen(e.GetPosition(_tabWindow));
+        if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _tabPressedAt = null;
+        _tabWindow.ReleaseMouseCapture();
+        DragFromTab(now);
+    }
+
+    private void OnTabMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || _tabPressedAt is null) return;
+        e.Handled = true;
+        _tabPressedAt = null;
+        _tabWindow!.ReleaseMouseCapture();
+        if (_tucked) _vm.PlayPauseCommand.Execute(null);
+    }
+
+    /// <summary>Dragging the tab: the full player comes back right under the pointer (cover centred on it) to be moved.</summary>
+    private void DragFromTab(Point pointer)
+    {
+        if (Mouse.LeftButton != MouseButtonState.Pressed) return;
         CompleteSlide();
         _hideTimer.Stop();
-        _revealTimer.Stop();
-        var pointer = _tabWindow!.PointToScreen(e.GetPosition(_tabWindow));
         var dpi = VisualTreeHelper.GetDpi(this);
         _tucked = false;
         ShowTab(false);
@@ -387,13 +409,12 @@ public partial class MiniPlayerWindow : Window
             ShowInTaskbar = false, Topmost = true, ShowActivated = false,
             DataContext = DataContext, Content = frame, Title = "YouTube Music Native mini player tab",
         };
-        _tabWindow.MouseEnter += (_, _) =>
-        {
-            _hideTimer.Stop();
-            if (_tucked) _revealTimer.Start();
-        };
-        _tabWindow.MouseLeave += (_, _) => _revealTimer.Stop();
+        // Hovering only shows the tab's play / pause; the player stays put until the tab is dragged out.
+        _tabWindow.MouseEnter += (_, _) => _hideTimer.Stop();
         _tabWindow.MouseLeftButtonDown += OnTabMouseDown;
+        _tabWindow.MouseMove += OnTabMouseMove;
+        _tabWindow.MouseLeftButtonUp += OnTabMouseUp;
+        _tabWindow.LostMouseCapture += (_, _) => _tabPressedAt = null;
     }
 
     private void ShowTab(bool show)
@@ -426,10 +447,11 @@ public partial class MiniPlayerWindow : Window
         return 1 + (c + 1) * Math.Pow(p - 1, 3) + c * Math.Pow(p - 1, 2);
     }
 
-    /// <summary>Peek out for a moment when the song changes while tucked away.</summary>
+    /// <summary>Peek out for a moment when the song changes while tucked away (if that's switched on in Settings).</summary>
     private void OnPlaybackChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(PlaybackService.NowPlaying) || _dock == Dock.None || !_tucked || !IsVisible) return;
+        if (!_store.Settings.MiniPeekOnSongChange) return;
         Reveal();
         _hideTimer.Interval = TimeSpan.FromSeconds(2.5);
         _hideTimer.Start();
