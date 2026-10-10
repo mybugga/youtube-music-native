@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:YouTubeMusicNative.Views"
+        xmlns:s="clr-namespace:YouTubeMusicNative.Services"
         Title="YouTube Music Native mini player"
         Icon="pack://application:,,,/Assets/app.ico"
         Width="440" Height="136" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
@@ -60,7 +61,8 @@
         </Style>
     </Window.Resources>
 
-    <Grid ClipToBounds="True" v:Motion.FadeIn="True">
+    <!-- Fades in when the window opens (in code: it's also hidden while tucked, and that shouldn't fade) -->
+    <Grid x:Name="Root" ClipToBounds="True">
         <Grid.RowDefinitions>
             <RowDefinition Height="136"/>
             <RowDefinition Height="*"/>
@@ -105,7 +107,13 @@
                     </Border.Background>
                 </Border>
                 <Border CornerRadius="8" Background="#99000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
-                    <v:Spinner Width="34" Height="34" Thickness="3"/>
+                    <Grid>
+                        <!-- Offline: a still mark rather than a spinner turning (and redrawing) until the connection is back -->
+                        <v:Spinner Width="34" Height="34" Thickness="3"
+                                   Visibility="{Binding IsOffline, Source={x:Static s:Connectivity.Instance}, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                        <TextBlock Text="&#xE701;" Style="{StaticResource Glyph}" FontSize="26" Foreground="White" ToolTip="Offline, reconnecting"
+                                   Visibility="{Binding IsOffline, Source={x:Static s:Connectivity.Instance}, Converter={StaticResource BoolVis}}"/>
+                    </Grid>
                 </Border>
                 <!-- Play / pause on the cover: shows on hover, and stays while paused -->
                 <Button x:Name="CoverPlay" Width="44" Height="44" FontSize="16" ToolTip="Play / Pause (Space)"
@@ -448,7 +456,12 @@
                 <TextBlock Text="&#xE768;" Style="{StaticResource Glyph}" FontSize="14" Foreground="White"/>
             </Border>
             <Border Background="#8C000000" Visibility="{Binding Playback.IsBuffering, Converter={StaticResource BoolVis}}">
-                <v:Spinner Width="20" Height="20" Thickness="2"/>
+                <Grid>
+                    <v:Spinner Width="20" Height="20" Thickness="2"
+                               Visibility="{Binding IsOffline, Source={x:Static s:Connectivity.Instance}, Converter={StaticResource Vis}, ConverterParameter=invert}"/>
+                    <TextBlock Text="&#xE701;" Style="{StaticResource Glyph}" FontSize="16" Foreground="White"
+                               Visibility="{Binding IsOffline, Source={x:Static s:Connectivity.Instance}, Converter={StaticResource BoolVis}}"/>
+                </Grid>
             </Border>
             <!-- hover: play / pause -->
             <Border Background="#B3000000" Opacity="0" v:Motion.Show="{Binding IsMouseOver, ElementName=Tab}">

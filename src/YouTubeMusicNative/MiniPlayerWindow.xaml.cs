@@ -15,8 +15,8 @@ namespace YouTubeMusicNative;
 
 /// <summary>
 /// Small always-on-top player. Drag anywhere to move; double-click the art for the full window.
-/// Dropped against the left or right screen edge it docks there: it slides off screen leaving a slim tab,
-/// slides back out while the pointer is over it, and peeks out briefly when the song changes.
+/// Dropped against the left or right screen edge it docks there: it slides off screen leaving a small cover tab
+/// (click: play / pause, drag: pull the player back out), and optionally peeks out when the song changes.
 /// </summary>
 public partial class MiniPlayerWindow : Window
 {
@@ -236,6 +236,7 @@ public partial class MiniPlayerWindow : Window
         {
             if (!IsVisible) _tabWindow?.Hide();
             else if (_tucked) ShowTab(true);
+            if (IsVisible && !_tucked) Motion.FadeInNow(Root);
         };
     }
 
@@ -360,23 +361,70 @@ public partial class MiniPlayerWindow : Window
         double target = _dock == Dock.Right ? area.Right - Width : area.Left;
         CompleteSlide();
         _tucked = false;
-        ShowTab(false);
-        SetCloaked(false);
-        SlideTo(target, 340, Spring, done: () =>
+        // The content was hidden while tucked: let it draw one frame (still cloaked) so it doesn't come out blank.
+        bool wasHidden = Root.Visibility != Visibility.Visible;
+        Root.Visibility = Visibility.Visible;
+        void SlideOut()
         {
-            // Came out without the pointer on it (or it moved off during the slide): tuck again after the usual delay.
-            if (!_tucked && _dock != Dock.None && !PointerOverWindow() && !IsHeld) _hideTimer.Start();
-        });
+            if (_tucked) return; // tucked away again in the meantime
+            ShowTab(false);
+            SetCloaked(false);
+            SlideTo(target, 340, Spring, done: () =>
+            {
+                // Came out without the pointer on it (or it moved off during the slide): tuck again after the usual delay.
+                if (!_tucked && _dock != Dock.None && !PointerOverWindow() && !IsHeld) _hideTimer.Start();
+            });
+        }
+        if (wasHidden) AfterNextFrame(SlideOut);
+        else SlideOut();
         if (_panel.IsExpanded && !_drawerOpen) _drawerShowTimer.Start();
     }
 
-    /// <summary>Hides / shows the window without unmapping it: a cloaked window keeps being drawn, just not shown.</summary>
+    /// <summary>
+    /// Runs once the next frame has been drawn (plus a moment for the render thread to show it), or after 120 ms
+    /// at the latest: WPF doesn't always report a frame for a cloaked window.
+    /// </summary>
+    private void AfterNextFrame(Action action)
+    {
+        bool done = false;
+        var fallback = new DispatcherTimer(DispatcherPriority.Render, Dispatcher) { Interval = TimeSpan.FromMilliseconds(120) };
+        void Run()
+        {
+            if (done) return;
+            done = true;
+            fallback.Stop();
+            CompositionTarget.Rendering -= OnFrame;
+            action();
+        }
+        void OnFrame(object? sender, EventArgs e)
+        {
+            CompositionTarget.Rendering -= OnFrame;
+            var shown = new DispatcherTimer(DispatcherPriority.Render, Dispatcher) { Interval = TimeSpan.FromMilliseconds(20) };
+            shown.Tick += (_, _) =>
+            {
+                shown.Stop();
+                Run();
+            };
+            shown.Start();
+        }
+        fallback.Tick += (_, _) => Run();
+        fallback.Start();
+        CompositionTarget.Rendering += OnFrame;
+    }
+
+    /// <summary>
+    /// Hides / shows the window without unmapping it. While cloaked its content is hidden as well, so nothing is
+    /// drawn: otherwise the seek bar alone redraws it every frame for as long as it stays tucked, into a window
+    /// Windows never shows, and after a while (with the PC short of memory) the window stopped drawing at all.
+    /// </summary>
     private void SetCloaked(bool cloaked)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
+        if (!cloaked) Root.Visibility = Visibility.Visible;
         int value = cloaked ? 1 : 0;
         DwmSetWindowAttribute(hwnd, DwmwaCloak, ref value, sizeof(int));
+        if (cloaked) Root.Visibility = Visibility.Hidden;
     }
 
     private bool PointerOverWindow()

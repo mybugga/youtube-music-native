@@ -123,6 +123,12 @@ public static class Motion
         };
     }
 
+    /// <summary>Fades the element in once, now (instant when animations are off).</summary>
+    public static void FadeInNow(UIElement element)
+    {
+        if (Enabled) Animate(element, UIElement.OpacityProperty, 0, 1, 240);
+    }
+
     /// <summary>Fades the element in each time it becomes visible (a window's content when the window is shown).</summary>
     public static readonly DependencyProperty FadeInProperty = DependencyProperty.RegisterAttached(
         "FadeIn", typeof(bool), typeof(Motion), new PropertyMetadata(false, OnFadeInChanged));
